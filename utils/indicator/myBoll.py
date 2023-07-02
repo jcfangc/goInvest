@@ -15,7 +15,7 @@ from typing import Literal
 def my_boll(
     product_code: str,
     today_date: dt.date,
-    time_window: int,
+    time_window: Literal[5, 10, 20, 50, 150],
     product_type: Literal["stock"],
 ) -> dict[str, DataFrame]:
     """
@@ -55,7 +55,7 @@ def my_boll(
         mid_sma_series = dp.dataPicker.indicator_source_picker(
             product_code=product_code,
             today_date=today_date,
-            time_window=time_window,
+            time_window=time_window,  # 这个参数改变中轴线的值
             indicator_name="SMA",
             product_type=product_type,
         )[period][
@@ -111,4 +111,9 @@ def my_boll(
 
 if __name__ == "__main__":
     # 测试
-    my_boll(product_code="002230", today_date=dt.date.today(), time_window=10)
+    my_boll(
+        product_code="002230",
+        today_date=dt.date.today(),
+        time_window=10,
+        product_type="stock",
+    )

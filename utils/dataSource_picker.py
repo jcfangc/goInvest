@@ -79,7 +79,8 @@ class dataPicker:
     def indicator_source_picker(
         product_code: str,
         today_date: dt.date,
-        time_window: int,
+        # 时间窗口只能是5，10，20，50，150中的一个
+        time_window: Literal[5, 10, 20, 50, 150],
         product_type: Literal["stock"],
         indicator_name: Literal["SMA", "Boll"],
     ) -> dict[str, DataFrame]:
@@ -137,7 +138,6 @@ class dataPicker:
                 dict_indicator = mySMA.my_SMA(
                     product_code=product_code,
                     today_date=today_date,
-                    time_window=time_window,
                     product_type=product_type,
                 )
         else:

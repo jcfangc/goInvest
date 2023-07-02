@@ -14,7 +14,6 @@ from typing import Literal
 def my_SMA(
     product_code: str,
     today_date: dt.date,
-    time_window: int,
     product_type: Literal["stock"],
 ) -> dict[str, DataFrame]:
     """
@@ -52,53 +51,29 @@ def my_SMA(
 
     # 根据数据和时间窗口滚动计算SMA
     for period in ["daily", "weekly"]:
-        # 如果time_window的值和[5,20,50,150]列表中的任意一个都不一样，那么执行以下程序
-        if time_window != any([5, 20, 50, 150]):
-            # 指定时间窗口，数值取三位小数
-            mid_sma = stock_df[period]["收盘"].rolling(time_window).mean().round(3)
-            # 5时间窗口，数值取三位小数
-            sma_5 = stock_df[period]["收盘"].rolling(5).mean().round(3)
-            # 20时间窗口，数值取三位小数
-            sma_20 = stock_df[period]["收盘"].rolling(20).mean().round(3)
-            # 50时间窗口，数值取三位小数
-            sma_50 = stock_df[period]["收盘"].rolling(50).mean().round(3)
-            # 150时间窗口，数值取三位小数
-            sma_150 = stock_df[period]["收盘"].rolling(150).mean().round(3)
+        # 5时间窗口，数值取三位小数
+        sma_5 = stock_df[period]["收盘"].rolling(5).mean().round(3)
+        # 10时间窗口，数值取三位小数
+        sma_10 = stock_df[period]["收盘"].rolling(10).mean().round(3)
+        # 20时间窗口，数值取三位小数
+        sma_20 = stock_df[period]["收盘"].rolling(20).mean().round(3)
+        # 50时间窗口，数值取三位小数
+        sma_50 = stock_df[period]["收盘"].rolling(50).mean().round(3)
+        # 150时间窗口，数值取三位小数
+        sma_150 = stock_df[period]["收盘"].rolling(150).mean().round(3)
 
-            # 均线数据汇合
-            df_sma_dict[period] = DataFrame(
-                {
-                    # 日期作为索引
-                    # 均线数据
-                    f"{time_window}均线": mid_sma,
-                    "5均线": sma_5,
-                    "20均线": sma_20,
-                    "50均线": sma_50,
-                    "150均线": sma_150,
-                }
-            )
-
-        else:
-            # 5时间窗口，数值取三位小数
-            sma_5 = stock_df[period]["收盘"].rolling(5).mean().round(3)
-            # 20时间窗口，数值取三位小数
-            sma_20 = stock_df[period]["收盘"].rolling(20).mean().round(3)
-            # 50时间窗口，数值取三位小数
-            sma_50 = stock_df[period]["收盘"].rolling(50).mean().round(3)
-            # 150时间窗口，数值取三位小数
-            sma_150 = stock_df[period]["收盘"].rolling(150).mean().round(3)
-
-            # 均线数据汇合
-            df_sma_dict[period] = DataFrame(
-                {
-                    # 日期作为索引
-                    # 均线数据
-                    "5均线": sma_5,
-                    "20均线": sma_20,
-                    "50均线": sma_50,
-                    "150均线": sma_150,
-                }
-            )
+        # 均线数据汇合
+        df_sma_dict[period] = DataFrame(
+            {
+                # 日期作为索引
+                # 均线数据
+                "5均线": sma_5,
+                "10均线": sma_10,
+                "20均线": sma_20,
+                "50均线": sma_50,
+                "150均线": sma_150,
+            }
+        )
 
         # 输出字典到csv文件
         with open(
@@ -116,6 +91,5 @@ if __name__ == "__main__":
     dict_sma_df = my_SMA(
         product_code="002230",
         today_date=dt.date.today(),
-        time_window=10,
         product_type="stock",
     )
