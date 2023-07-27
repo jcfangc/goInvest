@@ -7,8 +7,7 @@ import pandas as pd
 
 from pandas import DataFrame
 from goInvest.utils import data_obtainer as do
-from goInvest.utils.indicator import mySMA
-from goInvest.utils.indicator import myBoll
+from goInvest.utils.indicator import mySMA, myEMA, myBoll, myRSI
 from typing import Literal
 
 
@@ -79,22 +78,22 @@ class dataPicker:
     def indicator_source_picker(
         product_code: str,
         today_date: dt.date,
-        # 时间窗口只能是5，10，20，50，150中的一个
-        time_window: Literal[5, 10, 20, 50, 150],
         product_type: Literal["stock"],
-        indicator_name: Literal["SMA", "Boll"],
+        indicator_name: Literal["EMA", "SMA", "Boll", "RSI"],
     ) -> dict[str, DataFrame]:
         """
         寻找相应技术指标数据源\n
-        当indicator_name为"SMA"时，time_window为移动平均线的‘最小’时间窗口，程序会自动生成20，50，150周期的时间窗口\n
-        当indicator_name为"Boll"时，time_window为布林线的‘中轴线’时间窗口\n
         """
 
         match indicator_name:
+            case "EMA":
+                print("正在自动寻找'指数移动平均线'数据源...")
             case "SMA":
                 print("正在自动寻找'移动平均线'数据源...")
             case "Boll":
                 print("正在自动寻找'布林线'数据源...")
+            case "RSI":
+                print("正在自动寻找'相对强弱指标'数据源...")
 
         # 定义一个字典，用于存放返回的sma数据
         dict_indicator = {
@@ -131,11 +130,22 @@ class dataPicker:
                 dict_indicator = myBoll.my_boll(
                     product_code=product_code,
                     today_date=today_date,
-                    time_window=time_window,
                     product_type=product_type,
                 )
             elif indicator_name == "SMA":
                 dict_indicator = mySMA.my_SMA(
+                    product_code=product_code,
+                    today_date=today_date,
+                    product_type=product_type,
+                )
+            elif indicator_name == "EMA":
+                dict_indicator = myEMA.my_EMA(
+                    product_code=product_code,
+                    today_date=today_date,
+                    product_type=product_type,
+                )
+            elif indicator_name == "RSI":
+                dict_indicator = myRSI.my_rsi(
                     product_code=product_code,
                     today_date=today_date,
                     product_type=product_type,

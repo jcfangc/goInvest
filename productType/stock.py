@@ -14,7 +14,6 @@ class Stock:
     def __init__(self, requirement: Series) -> None:
         self.stock_code = requirement["identityCode"]
         self.today_date = dt.datetime.today().date()
-        self.time_window_5 = int(5)
 
     # 获取指定产品的日K/周K
     def obtain_kline(self) -> None:
@@ -31,5 +30,4 @@ class Stock:
         da.StockAnalyst(
             stock_code=self.stock_code,
             today_date=self.today_date,
-            time_window_5=self.time_window_5,
         ).analyze()

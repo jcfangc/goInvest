@@ -11,7 +11,7 @@ from utils import dataSource_picker as dp
 from typing import Literal
 
 
-def my_SMA(
+def my_EMA(
     product_code: str,
     today_date: dt.date,
     product_type: Literal["stock"],
@@ -19,7 +19,7 @@ def my_SMA(
     """
     本函数根据时间窗口计算移动平均线
     """
-    print(f"正在计算{product_code}移动平均线...")
+    print(f"正在计算{product_code}指数移动平均线...")
 
     # 文件路径
     data_path = f"{goInvest_path}\\data\\kline\\indicator"
@@ -30,7 +30,7 @@ def my_SMA(
             # 防止stock_code和k_period_short为None时参与比较
             if product_code is not None:
                 # 指定K线过去的数据会被删除
-                if (product_code and period_short and "SMA") in file_name:
+                if (product_code and period_short and "EMA") in file_name:
                     # 取得文件绝对路径
                     absfile_path = os.path.join(data_path, file_name)
                     print(f"删除冗余文件\n>>>>{file_name}")
@@ -44,7 +44,7 @@ def my_SMA(
     )
 
     # 定义一个字典，用于存放返回的不同周期sma数据
-    df_sma_dict = {
+    df_ema_dict = {
         "daily": DataFrame(),
         "weekly": DataFrame(),
     }
@@ -52,48 +52,48 @@ def my_SMA(
     # 根据数据和时间窗口滚动计算SMA
     for period in ["daily", "weekly"]:
         # 5时间窗口，数值取三位小数
-        sma_5 = stock_df[period]["收盘"].rolling(5).mean()
+        ema_5 = stock_df[period]["收盘"].ewm(span=5, adjust=False).mean()
         # 10时间窗口，数值取三位小数
-        sma_10 = stock_df[period]["收盘"].rolling(10).mean()
+        ema_10 = stock_df[period]["收盘"].ewm(span=10, adjust=False).mean()
         # 20时间窗口，数值取三位小数
-        sma_20 = stock_df[period]["收盘"].rolling(20).mean()
+        ema_20 = stock_df[period]["收盘"].ewm(span=20, adjust=False).mean()
         # 50时间窗口，数值取三位小数
-        sma_50 = stock_df[period]["收盘"].rolling(50).mean()
+        ema_50 = stock_df[period]["收盘"].ewm(span=50, adjust=False).mean()
         # 150时间窗口，数值取三位小数
-        sma_150 = stock_df[period]["收盘"].rolling(150).mean()
+        ema_150 = stock_df[period]["收盘"].ewm(span=150, adjust=False).mean()
 
         # 均线数据汇合
-        df_sma_dict[period] = DataFrame(
+        df_ema_dict[period] = DataFrame(
             {
                 # 日期作为索引
                 # 均线数据
-                "5均线": sma_5.round(3),
-                "10均线": sma_10.round(3),
-                "20均线": sma_20.round(3),
-                "50均线": sma_50.round(3),
-                "150均线": sma_150.round(3),
+                "5均线": ema_5.round(3),
+                "10均线": ema_10.round(3),
+                "20均线": ema_20.round(3),
+                "50均线": ema_50.round(3),
+                "150均线": ema_150.round(3),
             }
         )
 
         # 检查是否存在nan值
-        if df_sma_dict[period].isnull().values.any():
+        if df_ema_dict[period].isnull().values.any():
             # 填充nan值
-            df_sma_dict[period].fillna(value=0.0, inplace=True)
+            df_ema_dict[period].fillna(value=0.0, inplace=True)
 
         # 输出字典到csv文件
         with open(
-            file=f"{data_path}\\{product_code}{period[0].upper()}_{today_date.strftime('%m%d')}_SMA.csv",
+            file=f"{data_path}\\{product_code}{period[0].upper()}_{today_date.strftime('%m%d')}_EMA.csv",
             mode="w",
             encoding="utf-8",
         ) as f:
-            df_sma_dict[period].to_csv(f, index=True, encoding="utf-8")
+            df_ema_dict[period].to_csv(f, index=True, encoding="utf-8")
 
-    return df_sma_dict
+    return df_ema_dict
 
 
 if __name__ == "__main__":
-    # 调用函数stock_SMA
-    dict_sma_df = my_SMA(
+    # 调用函数stock_EMA
+    dict_ema_df = my_EMA(
         product_code="002230",
         today_date=dt.date.today(),
         product_type="stock",

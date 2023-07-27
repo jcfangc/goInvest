@@ -15,13 +15,15 @@ from typing import Literal
 def my_boll(
     product_code: str,
     today_date: dt.date,
-    time_window: Literal[5, 10, 20, 50, 150],
     product_type: Literal["stock"],
 ) -> dict[str, DataFrame]:
     """
-    本函数计算布林带，k线图和布林带上下界有交集的数据记录下来
+    本函数计算布林带，返回一个字典，包含不同周期的布林带数据
     """
     print(f"正在计算{product_code}的布林带...")
+
+    # 定义布林带的时间窗口
+    time_window = 10
 
     # 获取指定股票的DataFrame数据
     stock_df = dp.dataPicker.product_source_picker(
@@ -31,7 +33,7 @@ def my_boll(
     # 文件路径
     data_path = f"{goInvest_path}\\data\\kline\\indicator"
 
-    for period_short in ["D", "W", "M"]:
+    for period_short in ["D", "W"]:
         # 删除过往重复数据
         for file_name in os.listdir(data_path):
             # 防止stock_code和k_period_short为None时参与比较
@@ -55,7 +57,6 @@ def my_boll(
         mid_sma_series = dp.dataPicker.indicator_source_picker(
             product_code=product_code,
             today_date=today_date,
-            time_window=time_window,  # 这个参数改变中轴线的值
             indicator_name="SMA",
             product_type=product_type,
         )[period][
@@ -68,8 +69,8 @@ def my_boll(
         ]  # Name: 收盘, dtype: float64, index.name: 日期
         # 计算标准差
         sigma = (
-            stock_close_series.rolling(time_window).std() * 0.948
-        )  # 根据实际情况挑选最适合的修正系数0.948
+            stock_close_series.rolling(time_window).std() * 0.9485
+        )  # 根据实际情况挑选最适合的修正系数0.9485
 
         # 根据实际情况挑选最适合的系数
         k = 2
@@ -91,6 +92,11 @@ def my_boll(
                 "下轨": down_track.round(3),
             }
         )
+
+        # 检查是否存在nan值
+        if df.isnull().values.any():
+            # 填充nan值
+            df.fillna(value=0.0, inplace=True)
 
         # 输出字典为csv文件
         with open(
@@ -114,6 +120,5 @@ if __name__ == "__main__":
     my_boll(
         product_code="002230",
         today_date=dt.date.today(),
-        time_window=10,
         product_type="stock",
     )

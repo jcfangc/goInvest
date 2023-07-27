@@ -14,7 +14,6 @@ from datetime import timedelta
 class BollAnalyst:
     """
     根据布林线判断买入卖出\n
-    time_window_5: int,\n
     today_date: dt.date,\n
     product_code: str,\n
     product_type: Literal["stock"],
@@ -22,26 +21,31 @@ class BollAnalyst:
 
     def __init__(
         self,
-        time_window_5: Literal[5],
         today_date: dt.date,
         product_code: str,
         product_type: Literal["stock"],
     ) -> None:
-        self.time_window_5 = time_window_5
         self.product_code = product_code
         self.today_date = today_date
         self.product_type = product_type
 
-    def analyze(self) -> df:
-        boll_time_window = self.time_window_5 * 2  # （日K）10周期时间窗口，大概是半个月
+    def analyze(self) -> list[df]:
         # 计算股票的布林线
         dict_boll = dp.dataPicker.indicator_source_picker(
             product_code=self.product_code,
             today_date=self.today_date,
-            time_window=cast(Literal[10], boll_time_window),
             indicator_name="Boll",
             product_type=cast(Literal["stock"], self.product_type),
         )
+
+        boll_time_window = 0
+        # 找到包含‘中轴’的列名
+        for col in dict_boll["daily"].columns:
+            if "中轴" in col:
+                # 从列名中提取时间窗口（数字）
+                boll_time_window = int(col[2:])
+                break
+
         # 获取日K/周K数据
         ohlc_data = dp.dataPicker.product_source_picker(
             product_code=self.product_code,
@@ -198,13 +202,12 @@ class BollAnalyst:
             df_boll_judge.to_csv(f)
             print(f"查看{self.product_code}的布林线分析结果\n>>>>{f.name}")
 
-        return df_boll_judge
+        return [df_boll_judge]
 
 
-class SMAAnalyst:
+class MAAnalyst:
     """
     根据移动平均线判断买入卖出\n
-    time_window_5: int,\n
     today_date: dt.date,\n
     product_code: str,\n
     product_type: Literal["stock"],
@@ -212,31 +215,55 @@ class SMAAnalyst:
 
     def __init__(
         self,
-        time_window_5: int,
         today_date: dt.date,
         product_code: str,
         product_type: Literal["stock"],
     ) -> None:
-        self.time_window_5 = time_window_5
         self.product_code = product_code
         self.today_date = today_date
         self.product_type = product_type
 
-    def analyze(self):
+    def analyze(self) -> list[df]:
         # 获取股票K线移动平均线数据
         dict_sma_data = dp.dataPicker.indicator_source_picker(
             product_code=self.product_code,
             today_date=self.today_date,
-            time_window=cast(Literal[5], self.time_window_5),
             product_type=cast(Literal["stock"], self.product_type),
             indicator_name="SMA",
         )
 
-        # 调用策略函数
-        self._elastic_band_strategy(dict_sma_data)
-        self._mutiline_strategy(dict_sma_data)
+        if any(df.empty for df in dict_sma_data.values()):
+            raise ValueError("移动平均线数据为空！")
 
-    def _elastic_band_strategy(self, dict_sma_data: dict[str, df]):
+        # 调用策略函数
+        sma_elastic_band_judge = self._elastic_band_strategy(dict_sma_data, "SMA")
+        sma_mutiline_judge = self._mutiline_strategy(dict_sma_data, "SMA")
+
+        # 获取股票K线指数移动平均线数据
+        dict_ema_data = dp.dataPicker.indicator_source_picker(
+            product_code=self.product_code,
+            today_date=self.today_date,
+            product_type=cast(Literal["stock"], self.product_type),
+            indicator_name="EMA",
+        )
+
+        if any(df.empty for df in dict_ema_data.values()):
+            raise ValueError("指数移动平均线数据为空！")
+
+        # 调用策略函数
+        ema_elastic_band_judge = self._elastic_band_strategy(dict_ema_data, "EMA")
+        ema_mutiline_judge = self._mutiline_strategy(dict_ema_data, "EMA")
+
+        return [
+            sma_elastic_band_judge,
+            sma_mutiline_judge,
+            ema_elastic_band_judge,
+            ema_mutiline_judge,
+        ]
+
+    def _elastic_band_strategy(
+        self, dict_ma_data: dict[str, df], ma_name: Literal["SMA", "EMA"]
+    ) -> df:
         """
         弹力带策略\n
         这是一个基于经验的移动平均线策略，不一定具有普适性\n
@@ -247,29 +274,22 @@ class SMAAnalyst:
         由于数据的滞后性，判断出山谷时，已经错过了最佳买入时机\n
         因此，需要在山谷之后的上升趋势中卖出\n
         """
-
-        if any(df.empty for df in dict_sma_data.values()):
-            raise ValueError("移动平均线数据为空！")
-
         # 创建一个空的DataFrame
         # 第一列为“日期”索引，第二列（daily）第三列（weekly）为-1至1的SMA判断值
-        df_sma_judge = df(
-            index=dict_sma_data["daily"].index, columns=["daily", "weekly"]
-        )
+        df_ma_judge = df(index=dict_ma_data["daily"].index, columns=["daily", "weekly"])
         # 初始化布林线判断值为0
-        df_sma_judge["daily"] = 0
-        df_sma_judge["weekly"] = 0
+        df_ma_judge["daily"] = 0
+        df_ma_judge["weekly"] = 0
 
-        for period in dict_sma_data.keys():
-            # 去除含有nan的行
-            dict_sma_data[period].dropna(axis=0, how="any", inplace=True)
+        for period in dict_ma_data.keys():
+            # print(f"正在计算'{period}'移动平均线弹力带策略...")
             # 创建副本
-            new_dict_sma_data = dict_sma_data.copy()
+            new_dict_ma_data = dict_ma_data.copy()
             # 保留dict_sma_data[period]的中150均线>50均线>20均线>5均线的行
-            new_dict_sma_data[period] = new_dict_sma_data[period][
-                (dict_sma_data[period]["150均线"] > dict_sma_data[period]["50均线"])
-                & (dict_sma_data[period]["50均线"] > dict_sma_data[period]["20均线"])
-                & (dict_sma_data[period]["20均线"] > dict_sma_data[period]["5均线"])
+            new_dict_ma_data[period] = new_dict_ma_data[period][
+                (new_dict_ma_data[period]["150均线"] > new_dict_ma_data[period]["50均线"])
+                & (new_dict_ma_data[period]["50均线"] > new_dict_ma_data[period]["20均线"])
+                & (new_dict_ma_data[period]["20均线"] > new_dict_ma_data[period]["5均线"])
             ]
 
             # 判断条件1和条件2
@@ -285,19 +305,19 @@ class SMAAnalyst:
                     "avg_ratio",
                 ],
                 # 第一列为“日期”索引
-                index=new_dict_sma_data[period].index,
+                index=new_dict_ma_data[period].index,
             )
             # 第二列differ_1(150,50)
             ratio_df["differ_1"] = (
-                new_dict_sma_data[period]["150均线"] - new_dict_sma_data[period]["50均线"]
+                new_dict_ma_data[period]["150均线"] - new_dict_ma_data[period]["50均线"]
             ).round(3)
             # 第三列differ_2(50,20)
             ratio_df["differ_2"] = (
-                new_dict_sma_data[period]["50均线"] - new_dict_sma_data[period]["20均线"]
+                new_dict_ma_data[period]["50均线"] - new_dict_ma_data[period]["20均线"]
             ).round(3)
             # 第四列differ_3(20,5)
             ratio_df["differ_3"] = (
-                new_dict_sma_data[period]["20均线"] - new_dict_sma_data[period]["5均线"]
+                new_dict_ma_data[period]["20均线"] - new_dict_ma_data[period]["5均线"]
             ).round(3)
             # 第五列ratio_1(differ_1/differ_2)
             ratio_df["ratio_1"] = (ratio_df["differ_1"] / ratio_df["differ_2"]).round(4)
@@ -315,7 +335,7 @@ class SMAAnalyst:
             ).round(3)
 
             # 保留ratio_df中avg_ratio>=阈值的行
-            ratio_df = ratio_df[ratio_df["avg_ratio"] >= 0.7]  # 阈值为0.7
+            ratio_df = ratio_df[ratio_df["avg_ratio"] >= 0.5]  # 阈值为0.5
             # print(f"ratio_df:\n{ratio_df}")
 
             # 判断条件3
@@ -323,10 +343,10 @@ class SMAAnalyst:
             valley_df = df(
                 columns=["5均线", "is_valley"],
                 # 第一列为“日期”索引
-                index=new_dict_sma_data[period].index,
+                index=new_dict_ma_data[period].index,
             )
             # 第二列new_dict_sma_data[period]["5均线"]的值
-            valley_df["5均线"] = new_dict_sma_data[period]["5均线"]
+            valley_df["5均线"] = new_dict_ma_data[period]["5均线"]
             # 重新设置index为整数，将日期作为一列
             valley_df.reset_index(inplace=True)
             # 第三列是布尔值，初始化为False
@@ -369,7 +389,7 @@ class SMAAnalyst:
                         intersection_date.append(date2)
 
             # 加入df_sma_judge最后的index
-            intersection_date.append(df_sma_judge.index[-1])
+            intersection_date.append(df_ma_judge.index[-1])
             # 整理intersection_date顺序
             intersection_date.sort()
             # 连续的日期中（日期相差小于三日视作连续）取最早的一个，其余删除
@@ -389,21 +409,26 @@ class SMAAnalyst:
 
             # 创建空的DataFrame
             find_sold_df = df(
-                index=dict_sma_data[period].index,
+                index=dict_ma_data[period].index,
                 columns=["5均线-10均线", "5均线-20均线", "5均线-50均线"],
             )
             # 得到相应数值
             find_sold_df["5均线-10均线"] = (
-                dict_sma_data[period]["5均线"] - dict_sma_data[period]["10均线"]
+                dict_ma_data[period]["5均线"] - dict_ma_data[period]["10均线"]
             ).round(3)
             find_sold_df["5均线-20均线"] = (
-                dict_sma_data[period]["5均线"] - dict_sma_data[period]["20均线"]
+                dict_ma_data[period]["5均线"] - dict_ma_data[period]["20均线"]
             ).round(3)
             find_sold_df["5均线-50均线"] = (
-                dict_sma_data[period]["5均线"] - dict_sma_data[period]["50均线"]
+                dict_ma_data[period]["5均线"] - dict_ma_data[period]["50均线"]
             ).round(3)
 
-            # intersect_index是山谷的日期
+            # # 打印各个df日期，用于调试
+            # print(f"intersection_date:\n{intersection_date}")
+            # print(f"find_sold_df:\n{find_sold_df.index}")
+            # print(f"df_ma_judge:\n{df_ma_judge.index}")
+
+            # intersect_index是山谷的日期，山谷之后出现的均线上穿现象，都应该是卖出时机
             # 用for循环遍历dates
             for date in intersection_date[1:]:
                 first_10_signal = False
@@ -412,11 +437,11 @@ class SMAAnalyst:
                 # print(
                 #     f"\nform {intersection_date[intersection_date.index(date) - 1]} to {date}"
                 # )
-                # 遍历本循环的date和下个循环的date之间的日期
-                for index in df_sma_judge.index[
-                    df_sma_judge.index.get_loc(
+                # 遍历本循环的date和上个循环的date之间的日期
+                for index in find_sold_df.index[
+                    df_ma_judge.index.get_loc(
                         intersection_date[intersection_date.index(date) - 1]
-                    ) : df_sma_judge.index.get_loc(date)
+                    ) : df_ma_judge.index.get_loc(date)
                 ]:
                     # 如果第一次的上穿现象都检测到了，就跳出循环
                     if (
@@ -430,7 +455,7 @@ class SMAAnalyst:
                     ):
                         # print("5均线-10均线：" + f"{find_sold_df.loc[index, '5均线-10均线']}")
                         # print(index)
-                        df_sma_judge.loc[index, period] = -0.6
+                        df_ma_judge.loc[index, period] = -0.6
                         first_10_signal = True
                     # 此后遇到的第一个5均线值大于10均线值的日期，将其买卖值设为-0.8，应该卖出
                     if (
@@ -439,7 +464,7 @@ class SMAAnalyst:
                     ):
                         # print("5均线-20均线：" + f"{find_sold_df.loc[index, '5均线-20均线']}")
                         # print(index)
-                        df_sma_judge.loc[index, period] = -0.8
+                        df_ma_judge.loc[index, period] = -0.8
                         first_20_signal = True
                     # 此后遇到的第一个5均线值大于50均线值的日期，将其买卖值设为-1，应该卖出
                     if (
@@ -448,27 +473,41 @@ class SMAAnalyst:
                     ):
                         # print("5均线-50均线：" + f"{find_sold_df.loc[index, '5均线-50均线']}")
                         # print(index)
-                        df_sma_judge.loc[index, period] = -1
+                        df_ma_judge.loc[index, period] = -1
                         first_50_signal = True
 
         # 输出df_sma_judge为csv文件，在strategy文件夹中
         with open(
-            f"{goInvest_path}\\goInvest\\data\\kline\\indicator\\strategy\\{self.product_code}_SMA_elastic_band_anlysis.csv",
-            "w",
+            file=(
+                f"{goInvest_path}\\goInvest\\data\\kline\\indicator\\strategy\\{self.product_code}_{ma_name}_elastic_band_anlysis.csv"
+            ),
+            mode="w",
             encoding="utf-8",
         ) as f:
-            df_sma_judge.to_csv(f)
+            df_ma_judge.to_csv(f)
             print(f"查看{self.product_code}的移动均线（弹力绳策略）分析结果\n>>>>{f.name}")
 
-    def _mutiline_strategy(self, dict_sma_data: dict[str, df]):
+        return df_ma_judge
+
+    def _mutiline_strategy(
+        self, dict_ma_data: dict[str, df], ma_name: Literal["SMA", "EMA"]
+    ) -> df:
         """
         多线策略，即多条均线同时作为买入卖出的依据\n
         在一段上涨态势中\n
-        如果收盘价格跌破5均线，决策值设为-0.2\n
-        如果收盘价格跌破10均线，决策值设为-0.6\n
-        如果收盘价格跌破20均线，决策值设为-0.8\n
+        如果收盘价格跌破5均线，决策值设为-0.65\n
+        如果收盘价格跌破10均线，决策值设为-0.85\n
+        如果收盘价格跌破20均线，决策值设为-0.95\n
         如果收盘价格跌破50均线，决策值设为-1\n
         """
+
+        # 创建一个空的DataFrame
+        # 第一列为“日期”索引，第二列（daily）第三列（weekly）为-1至1的SMA判断值
+        df_ma_judge = df(index=dict_ma_data["daily"].index, columns=["daily", "weekly"])
+
+        # 初始化布林线判断值为0
+        df_ma_judge["daily"] = 0
+        df_ma_judge["weekly"] = 0
 
         # 获取股票数据
         ohlc_data = dp.dataPicker.product_source_picker(
@@ -476,58 +515,200 @@ class SMAAnalyst:
             today_date=self.today_date,
             product_type=cast(Literal["stock"], self.product_type),
         )
+        # 获取股票数据的日期，作为基准
+        # <class 'pandas.core.indexes.datetimes.DatetimeIndex'>
+        standard_daily_date = ohlc_data["daily"].index
+        standard_weekly_date = ohlc_data["weekly"].index
 
-        for period in dict_sma_data.keys():
-            sma_data = dict_sma_data[period]
+        for period in dict_ma_data.keys():
+            ma_data = dict_ma_data[period]
+            # print(sma_data.head(50))
             # 上涨态势的判断
-            # 5均线大于10均线，10均线大于20均线，20均线大于50均线
-            up_trend = sma_data[
-                (sma_data["5均线"] > sma_data["10均线"])
-                & (sma_data["10均线"] > sma_data["20均线"])
-                & (sma_data["20均线"] > sma_data["50均线"])
+            # 5均线大于10均线，10均线大于20均线，20均线大于50均线，50均线大于150均线
+            up_trend = ma_data[
+                (ma_data["5均线"] > ma_data["10均线"])
+                & (ma_data["10均线"] > ma_data["20均线"])
+                & (ma_data["20均线"] > ma_data["50均线"])
+                & (ma_data["50均线"] > ma_data["150均线"])
             ].index
+            # 确保up_trend是时间格式
+            up_trend = pd.to_datetime(up_trend)
 
-            dates_to_add_up = []
+            up_trend_too = []
             # 遍历上涨态势的日期
-            for date in up_trend[1:]:
-                # 如果日期前后间隔小于五天/五周
-                difference = date - up_trend[up_trend.get_loc(date) - 1]
-                if (
-                    (
-                        difference <= dt.timedelta(days=5)
-                        and difference > dt.timedelta(days=1)
+            for i in range(1, len(up_trend)):
+                date = up_trend[i]
+                prev_date = up_trend[i - 1]
+                # print(f"\ndate: {date}, prev_date: {prev_date}")
+                # 如果日期前后间隔小于5个交易日/2个交易周
+                # 那么将date和prev_date之间的日期视作连续的上升区间
+                if period == "daily":
+                    # 计算得出standard_daily_date中，prev_date和date之间的日期有几个（不包括prev_date和date）
+                    mask = (standard_daily_date > prev_date) & (
+                        standard_daily_date < date
                     )
-                    if period == "daily"
-                    else (
-                        difference <= dt.timedelta(weeks=2)
-                        and difference > dt.timedelta(weeks=1)
+                    dates_chosen = standard_daily_date[mask]
+                    # print(dates_between) if len(dates_between) > 0 else None
+                    if len(dates_chosen) <= 5 and len(dates_chosen) > 0:
+                        # prev_date之前的20个交易日
+                        prev_date_20 = standard_daily_date[
+                            standard_daily_date < prev_date
+                        ][-20:]
+                        # date之后的20个交易日
+                        date_20 = standard_daily_date[standard_daily_date > date][:20]
+                        # 添加整个列表而非单个元素就用extend
+                        up_trend_too.extend(dates_chosen)
+                        up_trend_too.extend(prev_date_20)
+                        up_trend_too.extend(date_20)
+                elif period == "weekly":
+                    # 计算得出standard_weekly_date中，prev_date和date之间的日期有几个（不包括prev_date和date）
+                    mask = (standard_weekly_date > prev_date) & (
+                        standard_weekly_date < date
                     )
-                ):
-                    # 将这段时间内的日期也加入up_trend
-                    for adddate in pd.date_range(
-                        start=up_trend[up_trend.get_loc(date) - 1], end=date
-                    ):
-                        dates_to_add_up.append(adddate)
-            # 将dates_to_add_up加入up_trend
-            up_trend = up_trend.append(pd.DatetimeIndex(dates_to_add_up))
-            print(f"{period}:\n{up_trend}")
+                    dates_chosen = standard_weekly_date[mask]
+                    # print(dates_between) if len(dates_between) > 0 else None
+                    if len(dates_chosen) <= 2 and len(dates_chosen) > 0:
+                        # prev_date之前的4个交易日
+                        prev_date_4 = standard_weekly_date[
+                            standard_weekly_date < prev_date
+                        ][-4:]
+                        # date之后的4个交易日
+                        date_4 = standard_weekly_date[standard_weekly_date > date][:4]
+                        # 添加整个列表而非单个元素就用extend
+                        up_trend_too.extend(dates_chosen)
+                        up_trend_too.extend(prev_date_4)
+                        up_trend_too.extend(date_4)
+                else:
+                    continue
+
+            # up_trend去重
+            up_trend = list(set(up_trend))
+            # up_trend和up_trend_too的合并
+            up_trend.extend(up_trend_too)
+            up_trend.sort()
+            # 将up_trend转换为时间格式
+            up_trend = pd.to_datetime(up_trend)
+            # print(f"up_trend:\n{up_trend}")
+
+            # 遍历上涨态势的日期
+            for date in up_trend:
+                # 表示收盘价
+                close_price = ohlc_data[period].loc[date, "收盘"]
+                # 表示50均线
+                sma_50 = ma_data.loc[date, "50均线"]
+                # 表示20均线
+                sma_20 = ma_data.loc[date, "20均线"]
+                # 表示10均线
+                sma_10 = ma_data.loc[date, "10均线"]
+                # 表示5均线
+                sma_5 = ma_data.loc[date, "5均线"]
+
+                # 如果收盘价跌破50均线，决策值设为-1
+                if close_price <= sma_50:  # type: ignore
+                    df_ma_judge.loc[date, period] = -1
+                # 如果收盘价跌破20均线，决策值设为-0.9
+                elif close_price <= sma_20:  # type: ignore
+                    df_ma_judge.loc[date, period] = -0.95
+                # 如果收盘价跌破10均线，决策值设为-0.75
+                elif close_price <= sma_10:  # type: ignore
+                    df_ma_judge.loc[date, period] = -0.85
+                # 如果收盘价跌破5均线，决策值设为-0.5
+                elif close_price <= sma_5:  # type: ignore
+                    df_ma_judge.loc[date, period] = -0.65
+                else:
+                    continue
+
+        # 输出df_sma_judge为csv文件，在strategy文件夹中
+        with open(
+            f"{goInvest_path}\\goInvest\\data\\kline\\indicator\\strategy\\{self.product_code}_{ma_name}_multiline_anlysis.csv",
+            "w",
+            encoding="utf-8",
+        ) as f:
+            df_ma_judge.to_csv(f)
+            print(f"查看{self.product_code}的移动均线（多均线策略）分析结果\n>>>>{f.name}")
+
+        return df_ma_judge
 
 
-class StockAnalyst(BollAnalyst, SMAAnalyst):
+class RSIAnalyst:
+    """
+    根据RSI指标判断买入卖出\n
+    """
+
+    def __init__(
+        self,
+        today_date: dt.date,
+        product_code: str,
+        product_type: Literal["stock"],
+    ) -> None:
+        self.product_code = product_code
+        self.today_date = today_date
+        self.product_type = product_type
+
+    def analyze(self) -> list[df]:
+        # 获取股票K线RSI数据
+        dict_rsi_data = dp.dataPicker.indicator_source_picker(
+            product_code=self.product_code,
+            today_date=self.today_date,
+            product_type=cast(Literal["stock"], self.product_type),
+            indicator_name="RSI",
+        )
+        return []
+
+
+class StockAnalyst(BollAnalyst, MAAnalyst):
     """
     传入股票K线数据，分析后返回买入卖出建议
     """
 
-    def __init__(
-        self, stock_code: str, today_date: dt.date, time_window_5: int
-    ) -> None:
+    def __init__(self, stock_code: str, today_date: dt.date) -> None:
         self.product_code = stock_code
         self.today_date = today_date
-        self.time_window_5 = time_window_5
         self.product_type = "stock"
 
     def analyze(self):
         # 调用BollAnalyst类的analyze方法
-        BollAnalyst.analyze(self)
+        self.result_list = BollAnalyst.analyze(self)
         # 调用SMAAnalyst类的analyze方法
-        SMAAnalyst.analyze(self)
+        self.result_list.extend(MAAnalyst.analyze(self))
+
+        print("开始计算综合分析结果...")
+        # 创建一个空的DataFrame，用于存放综合的买入卖出建议
+        df_comperhensive_judge = pd.DataFrame(
+            index=self.result_list[0].index, columns=["daily", "weekly"]
+        )
+
+        # 初始化df_comperhensive_judge的值为0
+        df_comperhensive_judge["daily"] = 0
+        df_comperhensive_judge["weekly"] = 0
+
+        # 遍历self.result_list
+        for df in self.result_list:
+            # print(df.head(30))
+            # 将df中的daily列和weekly列的值加到df_comperhensive_judge中
+            df_comperhensive_judge["daily"] += df["daily"]
+            df_comperhensive_judge["weekly"] += df["weekly"]
+
+        # 检查df_comperhensive_judge中的值是否存在nan
+        if df_comperhensive_judge.isnull().values.any():
+            # print(df_comperhensive_judge.head(50))
+            raise ValueError("df_comperhensive_judge中存在nan值！")
+
+        # 将df_comperhensive_judge中的值除以self.result_list的长度，得到平均值
+        length = len(self.result_list)
+        if length != 0:
+            df_comperhensive_judge["daily"] = (
+                df_comperhensive_judge["daily"] / length
+            ).round(3)
+            df_comperhensive_judge["weekly"] = (
+                df_comperhensive_judge["weekly"] / length
+            ).round(3)
+
+        # 输出综合的买入卖出建议为csv文件，在strategy文件夹中
+        with open(
+            file=f"{goInvest_path}\\goInvest\\data\\kline\\indicator\\strategy\\{self.product_code}_comprehensive_anlysis.csv",
+            mode="w",
+            encoding="utf-8",
+        ) as f:
+            df_comperhensive_judge.to_csv(f)
+            print(f"查看{self.product_code}的综合分析结果\n>>>>{f.name}")
