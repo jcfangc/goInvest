@@ -51,16 +51,17 @@ def my_EMA(
 
     # 根据数据和时间窗口滚动计算SMA
     for period in ["daily", "weekly"]:
+        closing_price = stock_df[period]["收盘"]
         # 5时间窗口，数值取三位小数
-        ema_5 = stock_df[period]["收盘"].ewm(span=5, adjust=False).mean()
+        ema_5 = closing_price.ewm(span=5, adjust=False).mean()
         # 10时间窗口，数值取三位小数
-        ema_10 = stock_df[period]["收盘"].ewm(span=10, adjust=False).mean()
+        ema_10 = closing_price.ewm(span=10, adjust=False).mean()
         # 20时间窗口，数值取三位小数
-        ema_20 = stock_df[period]["收盘"].ewm(span=20, adjust=False).mean()
+        ema_20 = closing_price.ewm(span=20, adjust=False).mean()
         # 50时间窗口，数值取三位小数
-        ema_50 = stock_df[period]["收盘"].ewm(span=50, adjust=False).mean()
+        ema_50 = closing_price.ewm(span=50, adjust=False).mean()
         # 150时间窗口，数值取三位小数
-        ema_150 = stock_df[period]["收盘"].ewm(span=150, adjust=False).mean()
+        ema_150 = closing_price.ewm(span=150, adjust=False).mean()
 
         # 均线数据汇合
         df_ema_dict[period] = DataFrame(

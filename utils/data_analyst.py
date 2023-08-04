@@ -633,6 +633,9 @@ class MAAnalyst:
 class RSIAnalyst:
     """
     根据RSI指标判断买入卖出\n
+    today_date: dt.date,\n
+    product_code: str,\n
+    product_type: Literal["stock"],\n
     """
 
     def __init__(
@@ -653,7 +656,44 @@ class RSIAnalyst:
             product_type=cast(Literal["stock"], self.product_type),
             indicator_name="RSI",
         )
+
+        if any(df.empty for df in dict_rsi_data.values()):
+            raise ValueError("RSI数据为空！")
+
+        # 调用策略函数
+
         return []
+
+    def _over_bought_sold_strategy(self, dict_rsi_data: dict[str, df]) -> df:
+        """
+        当RSI指标超买超卖时，买入卖出\n
+        超买：RSI指标大于70\n
+        超卖：RSI指标小于30\n
+        """
+        # 创建一个空的DataFrame，用于存放买入卖出数值
+        df_rsi_judge = df(
+            index=dict_rsi_data["daily"].index, columns=["daily", "weekly"]
+        )
+        # 初始化买入卖出数值为0.0
+        df_rsi_judge["daily"] = 0.0
+        df_rsi_judge["weekly"] = 0.0
+
+        # 遍历dict_rsi_data["daily"]的列，找到包含字符串“RSI_”的两列名，提取列名中的数字
+        short_term = long_term = 0
+        for col in dict_rsi_data["daily"].columns:
+            if "RSI_" in col:
+                if short_term == 0:
+                    short_term = str(col).split("_")[1]
+                else:
+                    long_term = str(col).split("_")[1]
+
+        if short_term == 0 or long_term == 0:
+            raise ValueError("RSI数据中缺少包含字符串“RSI_”的列！")
+        elif short_term >= long_term:
+            # 交换short_term和long_term的值
+            short_term, long_term = long_term, short_term
+
+        return df_rsi_judge
 
 
 class StockAnalyst(BollAnalyst, MAAnalyst):

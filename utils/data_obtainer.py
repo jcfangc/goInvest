@@ -30,9 +30,9 @@ def stock_data_obtainer(
             # 复权
             adjust="qfq",
             # K线图起始日期
-            start_date=(today_date - dt.timedelta(days=365 * 5)).strftime(
+            start_date=(today_date - dt.timedelta(days=365 * 20)).strftime(
                 "%Y%m%d"
-            ),  # 五年前的今天
+            ),  # 20年前的今天
             # K线图结束日期
             end_date=today_date.strftime("%Y%m%d"),  # 今天
         )

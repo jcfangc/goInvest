@@ -51,16 +51,17 @@ def my_SMA(
 
     # 根据数据和时间窗口滚动计算SMA
     for period in ["daily", "weekly"]:
+        closing_price = stock_df[period]["收盘"]
         # 5时间窗口，数值取三位小数
-        sma_5 = stock_df[period]["收盘"].rolling(5).mean()
+        sma_5 = closing_price.rolling(5).mean()
         # 10时间窗口，数值取三位小数
-        sma_10 = stock_df[period]["收盘"].rolling(10).mean()
+        sma_10 = closing_price.rolling(10).mean()
         # 20时间窗口，数值取三位小数
-        sma_20 = stock_df[period]["收盘"].rolling(20).mean()
+        sma_20 = closing_price.rolling(20).mean()
         # 50时间窗口，数值取三位小数
-        sma_50 = stock_df[period]["收盘"].rolling(50).mean()
+        sma_50 = closing_price.rolling(50).mean()
         # 150时间窗口，数值取三位小数
-        sma_150 = stock_df[period]["收盘"].rolling(150).mean()
+        sma_150 = closing_price.rolling(150).mean()
 
         # 均线数据汇合
         df_sma_dict[period] = DataFrame(

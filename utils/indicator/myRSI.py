@@ -80,6 +80,7 @@ def my_rsi(
                 f"avg_loss_{long_term}",
                 f"RSI_{short_term}",
                 f"RSI_{long_term}",
+                f"SMA_{short_term}",
             ],
         )
 
@@ -109,16 +110,24 @@ def my_rsi(
             df_rsi[f"avg_gain_{short_term}"]
             / (df_rsi[f"avg_gain_{short_term}"] + df_rsi[f"avg_loss_{short_term}"])
             * 100
-        ).round(3) - (
+        ) - (
             0.03 if short_term == 7 else 0
         )  # 根据实际情况，将RSI_short_term的值适当调整
+        df_rsi[f"RSI_{short_term}"] = df_rsi[f"RSI_{short_term}"].round(3)
+
         df_rsi[f"RSI_{long_term}"] = (
             df_rsi[f"avg_gain_{long_term}"]
             / (df_rsi[f"avg_gain_{long_term}"] + df_rsi[f"avg_loss_{long_term}"])
             * 100
-        ).round(3) - (
+        ) - (
             0.055 if long_term == 14 else 0
         )  # 根据实际情况，将RSI_long_term的值适当调整
+        df_rsi[f"RSI_{long_term}"] = df_rsi[f"RSI_{long_term}"].round(3)
+
+        # 计算SMA_short_term
+        df_rsi[f"SMA_{short_term}"] = (
+            df_rsi[f"RSI_{short_term}"].rolling(short_term).mean()
+        ).round(3)
 
         # 检查是否存在NaN值
         if df_rsi.isnull().values.any():
