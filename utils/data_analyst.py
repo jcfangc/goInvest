@@ -3,12 +3,12 @@
 import datetime as dt
 import pandas as pd
 
+from typing import Literal
 from pandas import DataFrame as df
-from goInvest.utils.indicator import myBoll as mb
 from utils import dataSource_picker as dp
-from typing import Literal, cast
 from . import goInvest_path
 from datetime import timedelta
+from utils.enumeration_label import ProductType, IndicatorName
 
 
 class BollAnalyst:
@@ -23,7 +23,7 @@ class BollAnalyst:
         self,
         today_date: dt.date,
         product_code: str,
-        product_type: Literal["stock"],
+        product_type: ProductType,
     ) -> None:
         self.product_code = product_code
         self.today_date = today_date
@@ -34,8 +34,8 @@ class BollAnalyst:
         dict_boll = dp.dataPicker.indicator_source_picker(
             product_code=self.product_code,
             today_date=self.today_date,
-            indicator_name="Boll",
-            product_type=cast(Literal["stock"], self.product_type),
+            indicator_name=IndicatorName.Boll,
+            product_type=self.product_type,
         )
 
         boll_time_window = 0
@@ -50,7 +50,7 @@ class BollAnalyst:
         ohlc_data = dp.dataPicker.product_source_picker(
             product_code=self.product_code,
             today_date=self.today_date,
-            product_type=cast(Literal["stock"], self.product_type),
+            product_type=self.product_type,
         )
 
         # 创建一个空的DataFrame
@@ -217,7 +217,7 @@ class MAAnalyst:
         self,
         today_date: dt.date,
         product_code: str,
-        product_type: Literal["stock"],
+        product_type: ProductType,
     ) -> None:
         self.product_code = product_code
         self.today_date = today_date
@@ -228,31 +228,35 @@ class MAAnalyst:
         dict_sma_data = dp.dataPicker.indicator_source_picker(
             product_code=self.product_code,
             today_date=self.today_date,
-            product_type=cast(Literal["stock"], self.product_type),
-            indicator_name="SMA",
+            product_type=self.product_type,
+            indicator_name=IndicatorName.SMA,
         )
 
         if any(df.empty for df in dict_sma_data.values()):
             raise ValueError("移动平均线数据为空！")
 
         # 调用策略函数
-        sma_elastic_band_judge = self._elastic_band_strategy(dict_sma_data, "SMA")
-        sma_mutiline_judge = self._mutiline_strategy(dict_sma_data, "SMA")
+        sma_elastic_band_judge = self._elastic_band_strategy(
+            dict_sma_data, IndicatorName.SMA
+        )
+        sma_mutiline_judge = self._mutiline_strategy(dict_sma_data, IndicatorName.SMA)
 
         # 获取股票K线指数移动平均线数据
         dict_ema_data = dp.dataPicker.indicator_source_picker(
             product_code=self.product_code,
             today_date=self.today_date,
-            product_type=cast(Literal["stock"], self.product_type),
-            indicator_name="EMA",
+            product_type=self.product_type,
+            indicator_name=IndicatorName.EMA,
         )
 
         if any(df.empty for df in dict_ema_data.values()):
             raise ValueError("指数移动平均线数据为空！")
 
         # 调用策略函数
-        ema_elastic_band_judge = self._elastic_band_strategy(dict_ema_data, "EMA")
-        ema_mutiline_judge = self._mutiline_strategy(dict_ema_data, "EMA")
+        ema_elastic_band_judge = self._elastic_band_strategy(
+            dict_ema_data, IndicatorName.EMA
+        )
+        ema_mutiline_judge = self._mutiline_strategy(dict_ema_data, IndicatorName.EMA)
 
         return [
             sma_elastic_band_judge,
@@ -262,7 +266,9 @@ class MAAnalyst:
         ]
 
     def _elastic_band_strategy(
-        self, dict_ma_data: dict[str, df], ma_name: Literal["SMA", "EMA"]
+        self,
+        dict_ma_data: dict[str, df],
+        ma_name: Literal[IndicatorName.SMA, IndicatorName.EMA],
     ) -> df:
         """
         弹力带策略\n
@@ -490,7 +496,9 @@ class MAAnalyst:
         return df_ma_judge
 
     def _mutiline_strategy(
-        self, dict_ma_data: dict[str, df], ma_name: Literal["SMA", "EMA"]
+        self,
+        dict_ma_data: dict[str, df],
+        ma_name: Literal[IndicatorName.SMA, IndicatorName.EMA],
     ) -> df:
         """
         多线策略，即多条均线同时作为买入卖出的依据\n
@@ -513,7 +521,7 @@ class MAAnalyst:
         ohlc_data = dp.dataPicker.product_source_picker(
             product_code=self.product_code,
             today_date=self.today_date,
-            product_type=cast(Literal["stock"], self.product_type),
+            product_type=self.product_type,
         )
         # 获取股票数据的日期，作为基准
         # <class 'pandas.core.indexes.datetimes.DatetimeIndex'>
@@ -593,15 +601,15 @@ class MAAnalyst:
             # 遍历上涨态势的日期
             for date in up_trend:
                 # 表示收盘价
-                close_price = ohlc_data[period].loc[date, "收盘"]
+                close_price = ohlc_data[period]["收盘"].loc[date]
                 # 表示50均线
-                sma_50 = ma_data.loc[date, "50均线"]
+                sma_50 = ma_data["50均线"].loc[date]
                 # 表示20均线
-                sma_20 = ma_data.loc[date, "20均线"]
+                sma_20 = ma_data["20均线"].loc[date]
                 # 表示10均线
-                sma_10 = ma_data.loc[date, "10均线"]
+                sma_10 = ma_data["10均线"].loc[date]
                 # 表示5均线
-                sma_5 = ma_data.loc[date, "5均线"]
+                sma_5 = ma_data["5均线"].loc[date]
 
                 # 如果收盘价跌破50均线，决策值设为-1
                 if close_price <= sma_50:  # type: ignore
@@ -635,14 +643,14 @@ class RSIAnalyst:
     根据RSI指标判断买入卖出\n
     today_date: dt.date,\n
     product_code: str,\n
-    product_type: Literal["stock"],\n
+    product_type: ProductType,\n
     """
 
     def __init__(
         self,
         today_date: dt.date,
         product_code: str,
-        product_type: Literal["stock"],
+        product_type: ProductType,
     ) -> None:
         self.product_code = product_code
         self.today_date = today_date
@@ -653,8 +661,8 @@ class RSIAnalyst:
         dict_rsi_data = dp.dataPicker.indicator_source_picker(
             product_code=self.product_code,
             today_date=self.today_date,
-            product_type=cast(Literal["stock"], self.product_type),
-            indicator_name="RSI",
+            product_type=self.product_type,
+            indicator_name=IndicatorName.RSI,
         )
 
         if any(df.empty for df in dict_rsi_data.values()):
@@ -704,7 +712,7 @@ class StockAnalyst(BollAnalyst, MAAnalyst):
     def __init__(self, stock_code: str, today_date: dt.date) -> None:
         self.product_code = stock_code
         self.today_date = today_date
-        self.product_type = "stock"
+        self.product_type = ProductType.Stock
 
     def analyze(self):
         # 调用BollAnalyst类的analyze方法

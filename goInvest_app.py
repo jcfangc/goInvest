@@ -20,7 +20,7 @@ class goInvest:
         for sequence in range(0, require_num):
             match requirements.loc[sequence, "productType"]:
                 case "stock":
-                    stock = sk.Stock(requirements.loc[sequence])
+                    stock = sk.Stock(requirements.loc[sequence], today_date=None)
                     stock.analyze_stock()
 
 

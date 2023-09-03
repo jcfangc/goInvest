@@ -1,4 +1,5 @@
-﻿import sys
+﻿"""__init__.py"""
+import sys
 import os
 
 # 解决模块导入问题

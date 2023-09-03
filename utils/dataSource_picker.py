@@ -7,8 +7,7 @@ import pandas as pd
 
 from pandas import DataFrame
 from goInvest.utils import data_obtainer as do
-from goInvest.utils.indicator import mySMA, myEMA, myBoll, myRSI
-from typing import Literal
+from utils.enumeration_label import ProductType, IndicatorName
 
 
 class dataPicker:
@@ -17,15 +16,17 @@ class dataPicker:
     @staticmethod
     def product_source_picker(
         product_code: str,
-        today_date: dt.date,
-        product_type: Literal["stock"],
+        today_date: dt.date | None,
+        product_type: ProductType,
     ) -> dict[str, DataFrame]:
         """
         自动寻找相应产品的数据源
         """
         match product_type:
-            case "stock":
+            case ProductType.Stock:
                 print("正在自动寻找'股票'数据源...")
+
+        today_date = dt.date.today() if today_date is None else today_date
 
         # 定义一个字典，用于存放返回的股票K线数据
         df_product_dict = {
@@ -58,7 +59,7 @@ class dataPicker:
 
         # 检查字典内的数据是不是都是空的DataFrame，如果是，自行获取
         if all(value.empty for value in df_product_dict.values()):
-            if product_type == "stock":
+            if product_type == ProductType.Stock:
                 df_product_dict = do.stock_data_obtainer(
                     stock_code=product_code,
                     today_date=today_date,
@@ -78,34 +79,34 @@ class dataPicker:
     def indicator_source_picker(
         product_code: str,
         today_date: dt.date,
-        product_type: Literal["stock"],
-        indicator_name: Literal["EMA", "SMA", "Boll", "RSI"],
+        product_type: ProductType,
+        indicator_name: IndicatorName,
     ) -> dict[str, DataFrame]:
         """
         寻找相应技术指标数据源\n
         """
 
         match indicator_name:
-            case "EMA":
+            case IndicatorName.EMA:
                 print("正在自动寻找'指数移动平均线'数据源...")
-            case "SMA":
+            case IndicatorName.SMA:
                 print("正在自动寻找'移动平均线'数据源...")
-            case "Boll":
+            case IndicatorName.Boll:
                 print("正在自动寻找'布林线'数据源...")
-            case "RSI":
+            case IndicatorName.RSI:
                 print("正在自动寻找'相对强弱指标'数据源...")
 
-        # 定义一个字典，用于存放返回的sma数据
+        # 定义一个字典，用于存放返回的数据
         dict_indicator = {
             "daily": DataFrame(),
             "weekly": DataFrame(),
         }
 
-        # sma数据源文件夹路径
+        # 数据源文件夹路径
         indicator_path = "goInvest\\data\\kline\\indicator"
 
         for file_name in os.listdir(indicator_path):
-            # 依次检查日K、周K的sma数据源是否存在
+            # 依次检查日K、周K的数据源是否存在
             for k_period_short in ["D", "W"]:
                 if (
                     f"{product_code}{k_period_short}_{today_date.strftime('%m%d')}_{indicator_name}.csv"
@@ -126,30 +127,42 @@ class dataPicker:
 
         # 检查字典内的数据是不是都是空的DataFrame，如果是，自行获取
         if all(value.empty for value in dict_indicator.values()):
-            if indicator_name == "Boll":
-                dict_indicator = myBoll.my_boll(
-                    product_code=product_code,
+            if indicator_name == IndicatorName.Boll:
+                from utils.indicator import myBoll
+
+                dict_indicator = myBoll.MyBoll(
+                    None,
                     today_date=today_date,
-                    product_type=product_type,
-                )
-            elif indicator_name == "SMA":
-                dict_indicator = mySMA.my_SMA(
                     product_code=product_code,
-                    today_date=today_date,
                     product_type=product_type,
-                )
-            elif indicator_name == "EMA":
-                dict_indicator = myEMA.my_EMA(
+                ).calculate_indicator()
+            elif indicator_name == IndicatorName.SMA:
+                from utils.indicator import mySMA
+
+                dict_indicator = mySMA.MySMA(
+                    None,
+                    today_date=today_date,
                     product_code=product_code,
-                    today_date=today_date,
                     product_type=product_type,
-                )
-            elif indicator_name == "RSI":
-                dict_indicator = myRSI.my_rsi(
+                ).calculate_indicator()
+            elif indicator_name == IndicatorName.EMA:
+                from utils.indicator import myEMA
+
+                dict_indicator = myEMA.MyEMA(
+                    None,
+                    today_date=today_date,
                     product_code=product_code,
-                    today_date=today_date,
                     product_type=product_type,
-                )
+                ).calculate_indicator()
+            elif indicator_name == IndicatorName.RSI:
+                from utils.indicator import myRSI
+
+                dict_indicator = myRSI.MyRSI(
+                    None,
+                    today_date=today_date,
+                    product_code=product_code,
+                    product_type=product_type,
+                ).calculate_indicator()
         else:
             # 遍历字典中的值，将每个DataFrame的“日期”列转换为datetime格式
             for df_indicator in dict_indicator.values():
