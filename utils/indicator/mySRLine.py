@@ -1,4 +1,5 @@
 """mySRLine.py"""
+
 if __name__ == "__main__":
     from __init__ import goInvest_path
 else:
@@ -9,6 +10,7 @@ import numpy as np
 import matplotlib.dates as mdates
 
 from pandas import DataFrame
+from utils import dataSource_picker as dp
 from utils.data_functionalizer import DataFunctionalizer as dfunc
 from utils.myIndicator_abc import MyIndicator
 from utils.enumeration_label import ProductType, IndicatorName, DataOperation
@@ -21,6 +23,7 @@ class MySRLine(MyIndicator):
         today_date: dt.date | None,
         product_code: str,
         product_type: ProductType,
+        product_df_dict: dict[str, DataFrame] | None,
     ) -> None:
         super().__init__(
             data_path=data_path,
@@ -28,6 +31,7 @@ class MySRLine(MyIndicator):
             product_code=product_code,
             product_type=product_type,
             indicator_name=IndicatorName.SRLine,
+            product_df_dict=product_df_dict,
         )
 
     def _remove_redundant_files(self) -> None:
@@ -50,7 +54,7 @@ class MySRLine(MyIndicator):
 
         # 根据数据和计算支撑/阻力线
         for period in ["daily", "weekly"]:
-            closing_price = self.product_df_list[period]["收盘"]
+            closing_price = self.product_df_dict[period]["收盘"]
             # 平滑后的收盘价
             closing_price_smoothed = dfunc.data_operator(
                 data_series=closing_price, sigma=10, operation=DataOperation.Smoother
@@ -60,7 +64,7 @@ class MySRLine(MyIndicator):
             prices = np.array(closing_price_smoothed.values)
 
             # 对数据进行线性变换
-            transed_data = dfunc._trend_transform(dates, prices, np.array([0, 0]))
+            transed_data = dfunc.trend_transform(dates, prices, np.array([0, 0]))
 
             # 将transed_data以第二列为基准大小排序
             sorted_index = np.argsort(transed_data[:, 1])
@@ -82,11 +86,11 @@ class MySRLine(MyIndicator):
             # 原数据拟合的一次函数参数作为逆变换的参考
             coefficients = np.polyfit(num_dates, prices, deg=1)
             # 阻力线逆变换
-            original_resistance_line_data = dfunc._trend_transform(
+            original_resistance_line_data = dfunc.trend_transform(
                 dates, np.polyval(resistance_line, num_dates), coefficients
             )
             # 支撑线逆变换
-            original_support_line_data = dfunc._trend_transform(
+            original_support_line_data = dfunc.trend_transform(
                 dates, np.polyval(support_line, num_dates), coefficients
             )
 
@@ -111,22 +115,21 @@ class MySRLine(MyIndicator):
             df_srline_dict[period]["阻力线"] = original_resistance_line_data[:, 1].round(3)
             df_srline_dict[period].index.name = "日期"
 
-            # 检查是否存在nan值
-            if df_srline_dict[period].isnull().values.any():
-                # 填充nan值
-                df_srline_dict[period].fillna(value=0.0, inplace=True)
-
-            # 输出字典到csv文件
-            with open(
-                file=f"{self.data_path}\\{self.product_code}{period[0].upper()}_{self.today_date.strftime('%m%d')}_SRLine.csv",
-                mode="w",
-                encoding="utf-8",
-            ) as f:
-                df_srline_dict[period].to_csv(f, index=True, encoding="utf-8")
-
+        # 保存指标
+        super().save_indicator(df_dict=df_srline_dict)
+        # 返回df_srline_dict
         return df_srline_dict
+
+    def analyze(self) -> list[DataFrame]:
+        dict_srline = super().pre_analyze()
+
+        # 调用策略函数
+
+        return []
 
 
 if __name__ == "__main__":
     # 调用函数
-    MySRLine(None, dt.date.today(), "002230", ProductType.Stock).calculate_indicator()
+    MySRLine(
+        None, dt.date.today(), "002230", ProductType.Stock, None
+    ).calculate_indicator()

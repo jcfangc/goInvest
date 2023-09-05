@@ -81,6 +81,7 @@ class dataPicker:
         today_date: dt.date,
         product_type: ProductType,
         indicator_name: IndicatorName,
+        product_df_dict: dict[str, DataFrame] | None,
     ) -> dict[str, DataFrame]:
         """
         寻找相应技术指标数据源\n
@@ -109,18 +110,22 @@ class dataPicker:
             # 依次检查日K、周K的数据源是否存在
             for k_period_short in ["D", "W"]:
                 if (
-                    f"{product_code}{k_period_short}_{today_date.strftime('%m%d')}_{indicator_name}.csv"
+                    f"{product_code}{k_period_short}_{today_date.strftime('%m%d')}_{indicator_name.value}.csv"
                     == file_name
                 ):
                     file_path = os.path.join(indicator_path, file_name)
                     match k_period_short:
                         case "D":
-                            print(f"最新日{indicator_name}数据已经保存在{file_path}，正在读取...")
+                            print(
+                                f"最新日'{indicator_name.value}'数据已经保存在{file_path}，正在读取..."
+                            )
                             dict_indicator["daily"] = pd.read_csv(
                                 file_path,
                             )
                         case "W":
-                            print(f"最新周{indicator_name}数据已经保存在{file_path}，正在读取...")
+                            print(
+                                f"最新周'{indicator_name.value}'数据已经保存在{file_path}，正在读取..."
+                            )
                             dict_indicator["weekly"] = pd.read_csv(
                                 file_path,
                             )
@@ -135,6 +140,7 @@ class dataPicker:
                     today_date=today_date,
                     product_code=product_code,
                     product_type=product_type,
+                    product_df_dict=product_df_dict,
                 ).calculate_indicator()
             elif indicator_name == IndicatorName.SMA:
                 from utils.indicator import mySMA
@@ -144,6 +150,7 @@ class dataPicker:
                     today_date=today_date,
                     product_code=product_code,
                     product_type=product_type,
+                    product_df_dict=product_df_dict,
                 ).calculate_indicator()
             elif indicator_name == IndicatorName.EMA:
                 from utils.indicator import myEMA
@@ -153,6 +160,7 @@ class dataPicker:
                     today_date=today_date,
                     product_code=product_code,
                     product_type=product_type,
+                    product_df_dict=product_df_dict,
                 ).calculate_indicator()
             elif indicator_name == IndicatorName.RSI:
                 from utils.indicator import myRSI
@@ -162,6 +170,7 @@ class dataPicker:
                     today_date=today_date,
                     product_code=product_code,
                     product_type=product_type,
+                    product_df_dict=product_df_dict,
                 ).calculate_indicator()
         else:
             # 遍历字典中的值，将每个DataFrame的“日期”列转换为datetime格式
