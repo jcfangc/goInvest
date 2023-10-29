@@ -14,7 +14,7 @@ class ProductType(Enum):
     Stock = "stock"
 
 
-class DataOperation(Enum):
+class SeriesOperation(Enum):
     Smoother = "smoother"
     InflectionPoint = "inflectionPoint"
     Refine = "refine"

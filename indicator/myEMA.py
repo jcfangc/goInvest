@@ -1,16 +1,11 @@
 """myEMA.py"""
 
-if __name__ == "__main__":
-    from __init__ import goInvest_path
-else:
-    from . import goInvest_path
 
 import datetime as dt
 import pandas as pd
 
 from pandas import DataFrame
 from utils.myIndicator_abc import MyIndicator
-from utils import dataSource_picker as dp
 from utils.enumeration_label import ProductType, IndicatorName
 
 

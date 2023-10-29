@@ -1,9 +1,11 @@
 """data_functionalizer.py 试图将数据处理函数化"""
 
 if __name__ == "__main__":
-    from __init__ import goInvest_path
-else:
-    from . import goInvest_path
+    import sys
+    import os
+
+    # 将上级目录加入sys.path
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[0]))))
 
 import datetime as dt
 import pandas as pd
@@ -12,9 +14,9 @@ import numpy as np
 import matplotlib.dates as mdates
 
 from pandas import DataFrame, Series
-from goInvest.utils import dataSource_picker as dsp
+from utils import dataSource_picker as dsp
 from scipy.ndimage import gaussian_filter
-from utils.enumeration_label import ProductType, DataOperation
+from utils.enumeration_label import ProductType, SeriesOperation
 
 
 class DataFunctionalizer:
@@ -36,46 +38,71 @@ class DataFunctionalizer:
                 today_date=self.today_date,
                 product_type=self.product_type,
             )
+        self.standard_daily_index = self.df_product_dict["daily"].index
+        self.standard_weekly_index = self.df_product_dict["weekly"].index
 
     @staticmethod
-    def data_operator(
+    def _checking(
+        data_series: Series, call_name: str, the_type=None, numeric: bool | None = False
+    ) -> None:
+        """
+        检查数据类型是否正确\n
+        data_series: 要检查的数据\n
+        call_name: 调用的函数名\n
+        the_type: 指定的数据类型\n
+        numeric: 是否为数值型，默认为False\n
+        """
+        # 检查数据非空
+        if data_series.empty:
+            raise ValueError("数据为空，无法进行操作，调用函数为" + call_name)
+
+        # 检查数据类型为可计算类型
+        if numeric:
+            for index, value in data_series.items():
+                # is_numeric_dtype函数的参数应该为Series，所以需要将value转换为Series
+                is_numeric = pd.api.types.is_numeric_dtype(Series(value))
+                if not is_numeric:
+                    raise TypeError(
+                        f"{index}的数据类型为{type(value)}，无法进行计算，调用函数为{call_name}"
+                    )
+
+        # 检测值的数据类型是否为指定类型
+        if the_type is not None:
+            for index, value in data_series.items():
+                if not isinstance(value, the_type):
+                    raise TypeError(
+                        f"{index}的数据类型为{type(value)}，应为{the_type}，无法进行操作，调用函数为{call_name}"
+                    )
+
+    def series_operator(
+        self,
         data_series: Series,
         sigma: float,
-        operation: DataOperation,
+        operation: SeriesOperation,
         plot: bool | None = False,
     ) -> Series:
         return_series = Series(index=data_series.index)
 
         match operation:
-            case DataOperation.Smoother:
-                return_series = DataFunctionalizer._smoother_operation(
+            case SeriesOperation.Smoother:
+                return_series = DataFunctionalizer.smoother_operation(
                     data_series=data_series, sigma=sigma, plot=plot
                 )
 
-            case DataOperation.InflectionPoint:
-                return_series = DataFunctionalizer._inflection_point_operation(
+            case SeriesOperation.InflectionPoint:
+                return_series = DataFunctionalizer.inflection_point_operation(
                     data_series=data_series, sigma=sigma, plot=plot
                 )
 
-            case DataOperation.Refine:
-                return_series = DataFunctionalizer._refine_operation(
+            case SeriesOperation.Refine:
+                return_series = DataFunctionalizer.refine_operation(
                     data_series=data_series, plot=plot
                 )
-
-        if plot:
-            # 绘制
-            try:
-                data_series.plot(label="Raw Data", alpha=0.5)
-                plt.legend()
-                plt.show()
-            except TypeError:
-                plt.legend()
-                plt.show()
 
         return return_series
 
     @staticmethod
-    def _smoother_operation(
+    def smoother_operation(
         data_series: Series,
         sigma: float,
         plot: bool | None = False,
@@ -83,6 +110,14 @@ class DataFunctionalizer:
         """
         平滑数据，sigma：越大去噪效果越强，细节越少
         """
+
+        # 检查
+        DataFunctionalizer._checking(
+            the_type=float,
+            data_series=data_series,
+            call_name=DataFunctionalizer.smoother_operation.__name__,
+        )
+
         # 转换为 NumPy 数组
         data_array = data_series.values
         # 使用高斯滤波器平滑数据
@@ -94,22 +129,41 @@ class DataFunctionalizer:
         if plot:
             # 返回平滑后的数据
             smoothed_series.plot(label="Smoothed Data")
+            # 绘制
+            try:
+                data_series.plot(label="Raw Data", alpha=0.5)
+                plt.legend()
+                plt.show()
+            except TypeError:
+                plt.legend()
+                plt.show()
+
         # 返回结果
         return return_series
 
     @staticmethod
-    def _inflection_point_operation(
+    def inflection_point_operation(
         data_series: Series, sigma: float, plot: bool | None = False
     ) -> Series:
         """
-        寻找拐点
+        寻找拐点\n
+        输入的series数据应该为浮点型\n
+        返回的series数据为浮点型，为拐点对应的值\n
         """
+
+        # 检查
+        DataFunctionalizer._checking(
+            the_type=float,
+            data_series=data_series,
+            call_name=DataFunctionalizer.inflection_point_operation.__name__,
+        )
+
         # 转换为 NumPy 数组
         data_array = data_series.values
         # 使用高斯滤波器平滑数据
         smoothed_array = gaussian_filter(data_array, sigma=sigma)
         # 将结果转换回 Series
-        smoothed_series = Series(smoothed_array, index=data_series.index)
+        smoothed_series = Series(smoothed_array, index=data_series.index, name="平滑数据")
         if plot:
             smoothed_series.plot(label="Smoothed Data")
         # 滚动计算平滑后两点之间的斜率
@@ -134,6 +188,10 @@ class DataFunctionalizer:
         inflecting_series.drop_duplicates(inplace=True)
         # 取对应下标的值
         return_series = smoothed_series[inflecting_series.index]
+        # 排序
+        return_series.sort_index(inplace=True)
+        # 保留四位小数
+        return_series = return_series.apply(lambda x: round(x, 4))
         if plot:
             # 绘图准备（点图）
             plt.scatter(
@@ -143,18 +201,32 @@ class DataFunctionalizer:
                 color="red",
                 alpha=0.3,
             )
+            # 绘制
+            try:
+                data_series.plot(label="Raw Data", alpha=0.5)
+                plt.legend()
+                plt.show()
+            except TypeError:
+                plt.legend()
+                plt.show()
+
         # 返回结果
         return return_series
 
     @staticmethod
-    def _refine_operation(data_series: Series, plot: bool | None = False) -> Series:
+    def refine_operation(data_series: Series, plot: bool | None = False) -> Series:
         """
-        输入的series数据应该为bool类型，True为粘连数据，False为非粘连数据
-        精炼数据，将粘连数据合并
+        精炼数据，将粘连数据合并\n
+        输入的series数据应该为bool类型，True为粘连数据，False为非粘连数据\n
+        返回的series数据为bool类型，True为精炼数据点，False为非精炼数据点\n
         """
-        # 检测值的数据类型是否为布尔型
-        if data_series.dtype != bool:
-            raise TypeError("输入的series元素数据类型应为布尔型")
+
+        # 检查
+        DataFunctionalizer._checking(
+            the_type=bool,
+            data_series=data_series,
+            call_name=DataFunctionalizer.refine_operation.__name__,
+        )
 
         # 积分窗口
         accumulation_window = int(len(data_series) * 0.005)
@@ -166,7 +238,7 @@ class DataFunctionalizer:
         for i in range(int(accumulation_window / 2), 0, -1):
             accumulation_list.append(i)
 
-        print(accumulation_list)
+        # print(accumulation_list)
 
         # 创建DataFrame作为积分表格
         accumulation_df = DataFrame(index=data_series.index, columns=["value"])
@@ -181,14 +253,16 @@ class DataFunctionalizer:
         glue_df_index = accumulation_df[accumulation_df["日期"].isin(glue_index)].index
         # print(glue_df_index)
 
-        # 计算偏移值（是中间元素的偏左或偏右多少位）
-        offset = -int(len(accumulation_list))
-        # 遍历这些下标，添加积分
-        for marks in accumulation_list:
-            for i in glue_df_index:
-                if (i + offset) in accumulation_df.index:
-                    accumulation_df.loc[i + offset, "value"] += marks
-            offset += 1
+        # 对所有粘连数据的进行处理
+        for gdi in glue_df_index:
+            for i in range(len(accumulation_list)):
+                # 判断积分值的下标是否在积分表格的范围内
+                if (gdi - len(accumulation_list) // 2 + i >= 0) and (
+                    gdi - len(accumulation_list) // 2 + i < len(data_series)
+                ):
+                    accumulation_df.loc[
+                        gdi - len(accumulation_list) // 2 + i, "value"
+                    ] += accumulation_list[i]
 
         # 将积分值转换为Series
         accumulation_series = Series(
@@ -201,8 +275,9 @@ class DataFunctionalizer:
 
         # 根据积分数据进行精炼，非零积分值从前往后两两相减
         differ_dataframe = DataFrame(
-            index=accumulation_series.index, columns=["差值", "精炼类型", "精炼值"]
+            index=accumulation_series.index, columns=["积分值", "差值", "精炼类型", "精炼值"]
         )
+        differ_dataframe["积分值"] = accumulation_series
         # 重设index
         differ_dataframe.reset_index(inplace=True)
         # 初始化
@@ -216,27 +291,34 @@ class DataFunctionalizer:
                     accumulation_series[i] - accumulation_series[i - 1]
                 )
         # 根据差值判断精炼类型
+        height = sum(accumulation_list)
         for i in differ_dataframe.index:
             if (i - 1) in differ_dataframe.index:
                 # 精炼类型一："tip"
-                if (differ_dataframe.loc[i - 1, "差值"] < 0) and (differ_dataframe.loc[i, "差值"] > 0):  # type: ignore
-                    differ_dataframe.loc[i, "精炼类型"] = "tip"
+                if (differ_dataframe.loc[i - 1, "差值"] == 1) and (
+                    differ_dataframe.loc[i, "差值"] == -1
+                ):
+                    differ_dataframe.loc[i - 1, "精炼类型"] = "tip"
+                    continue
+
+                elif (differ_dataframe.loc[i - 1, "差值"] == 2) and (
+                    differ_dataframe.loc[i, "差值"] == 0
+                ):
+                    differ_dataframe.loc[i - 1, "精炼类型"] = "tip"
+                    continue
+
                 # 精炼类型二："platform"
-                platform_stage = False
-                if (differ_dataframe.loc[i - 1, "差值"] < 0) and (differ_dataframe.loc[i, "差值"] == 0):  # type: ignore
-                    differ_dataframe.loc[i, "精炼类型"] = "platform"
-                    platform_stage = True
-                elif (
-                    (differ_dataframe.loc[i - 1, "差值"] == 0)
-                    and (differ_dataframe.loc[i, "差值"] == 0)
-                    and platform_stage  # 确保是在平台上
+                if (differ_dataframe.loc[i, "积分值"] == height) and (
+                    differ_dataframe.loc[i, "差值"] == 1
                 ):
                     differ_dataframe.loc[i, "精炼类型"] = "platform"
-                elif (differ_dataframe.loc[i - 1, "差值"] == 0) and (differ_dataframe.loc[i, "差值"] > 0) and platform_stage:  # type: ignore
-                    differ_dataframe.loc[i, "精炼类型"] = "platform"
-                    platform_stage = False
 
-        print(differ_dataframe)
+                elif (differ_dataframe.loc[i, "积分值"] == height) and (
+                    differ_dataframe.loc[i, "差值"] == 0
+                ):
+                    differ_dataframe.loc[i, "精炼类型"] = "platform"
+
+        # print(differ_dataframe)
 
         # 根据精炼类型判断精炼值
         platform_length = 0
@@ -247,15 +329,51 @@ class DataFunctionalizer:
                 platform_length += 1
             elif differ_dataframe.loc[i, "精炼类型"] == "undefined":
                 if platform_length > 0:
-                    differ_dataframe.loc[i - int(platform_length * 1 / 2), "精炼值"] = True
+                    half_length = platform_length // 2
+                    # 当differ_dataframe.loc[i, "精炼类型"]为"undefined"时，才会计算平台中间位置。
+                    # 这意味着，平台已经结束，当前的索引i已经超出了平台的范围，所以要额外减一
+                    platform_middle = i - half_length - 1
+                    differ_dataframe.loc[platform_middle, "精炼值"] = True
                 platform_length = 0
+
+        differ_dataframe.to_csv("differ.csv")
 
         # 恢复index
         differ_dataframe.set_index("日期", inplace=True)
         # 将精炼值转换为Series
         return_series = differ_dataframe["精炼值"]
-        # 返回结果
+
+        if plot:
+            # 绘制
+            try:
+                data_series.plot(label="Raw Data", alpha=0.5)
+                plt.legend()
+                plt.show()
+            except TypeError:
+                plt.legend()
+                plt.show()
+
         return return_series
+
+    # 本函数依赖于standard_daily_index和standard_weekly_index，所以不可能是静态方法
+    def _vibration_merge_operation(
+        self, data_series: Series, plot: bool | None = False
+    ) -> Series:
+        """将震荡造成的粘连数据合并"""
+
+        # 检查
+        DataFunctionalizer._checking(
+            data_series=data_series,
+            call_name=DataFunctionalizer._vibration_merge_operation.__name__,
+            the_type=None,
+            numeric=True,
+        )
+
+        # series中的值两两相差
+        differ_series = data_series.diff()
+        print(f"差值：{differ_series}")
+
+        return Series()
 
     @staticmethod
     def trend_transform(
@@ -378,6 +496,13 @@ class DataFunctionalizer:
 
             return original_data_points
 
+    # @staticmethod
+    # def check_interweave(
+    #     main_series: Series,
+    #     sub_series: Series,
+    #     direction: bool,
+    # )->Series:
+
 
 if __name__ == "__main__":
     test = DataFunctionalizer(
@@ -394,22 +519,31 @@ if __name__ == "__main__":
     #     operation=DataOperation.Smoother,
     # )
 
-    test_series = test.data_operator(
-        data_series=test.df_product_dict["daily"]["收盘"],
-        sigma=60,
-        plot=False,
-        operation=DataOperation.InflectionPoint,
+    inflection_point_series = DataFunctionalizer.inflection_point_operation(
+        data_series=test.df_product_dict["daily"]["收盘"], sigma=60, plot=True
     )
 
     bool_series = Series(index=test.df_product_dict["daily"]["收盘"].index)
     # 初始化bool_series为False
     bool_series = bool_series.apply(lambda x: False)
     # 将拐点的index对应的bool_series值设为True
-    bool_series[test_series.index] = True
-
-    test.data_operator(
-        data_series=bool_series,
-        sigma=60,
-        plot=True,
-        operation=DataOperation.Refine,
+    bool_series[inflection_point_series.index] = True
+    # 处理好的boolSeries传入refine_operation函数处理精炼
+    refined_series = DataFunctionalizer.refine_operation(
+        data_series=bool_series, plot=True
     )
+    # 取出精炼后的拐点
+    refined_inflection_point_series = inflection_point_series[refined_series]
+    # 绘制
+    plt.scatter(
+        refined_inflection_point_series.index,
+        refined_inflection_point_series,
+        label="Refined Inflection Point",
+        color="red",
+        alpha=0.3,
+    )
+    test.df_product_dict["daily"]["收盘"].plot(label="Raw Data", alpha=0.5)
+    plt.legend()
+    plt.show()
+    # 消除震荡导致的拐点
+    test._vibration_merge_operation(data_series=refined_inflection_point_series)

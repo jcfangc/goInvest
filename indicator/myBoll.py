@@ -1,10 +1,5 @@
 """myBoll.py"""
 
-if __name__ == "__main__":
-    from __init__ import goInvest_path
-else:
-    from . import goInvest_path
-
 import datetime as dt
 
 

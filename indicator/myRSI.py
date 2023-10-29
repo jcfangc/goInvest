@@ -1,14 +1,8 @@
 """myRSI.py"""
 
-if __name__ == "__main__":
-    from __init__ import goInvest_path
-else:
-    from . import goInvest_path
-
 import datetime as dt
 
 from pandas import DataFrame, Series
-from utils import dataSource_picker as dp
 from utils.myIndicator_abc import MyIndicator
 from utils.enumeration_label import ProductType, IndicatorName
 

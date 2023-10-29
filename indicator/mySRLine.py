@@ -1,19 +1,13 @@
 """mySRLine.py"""
 
-if __name__ == "__main__":
-    from __init__ import goInvest_path
-else:
-    from . import goInvest_path
-
 import datetime as dt
 import numpy as np
 import matplotlib.dates as mdates
 
 from pandas import DataFrame
-from utils import dataSource_picker as dp
 from utils.data_functionalizer import DataFunctionalizer as dfunc
 from utils.myIndicator_abc import MyIndicator
-from utils.enumeration_label import ProductType, IndicatorName, DataOperation
+from utils.enumeration_label import ProductType, IndicatorName
 
 
 class MySRLine(MyIndicator):
@@ -56,8 +50,8 @@ class MySRLine(MyIndicator):
         for period in ["daily", "weekly"]:
             closing_price = self.product_df_dict[period]["收盘"]
             # 平滑后的收盘价
-            closing_price_smoothed = dfunc.data_operator(
-                data_series=closing_price, sigma=10, operation=DataOperation.Smoother
+            closing_price_smoothed = dfunc.smoother_operation(
+                data_series=closing_price, sigma=10
             )
             # 将日期转化为数字，并变为np数组
             dates = np.array(closing_price_smoothed.index)

@@ -6,6 +6,7 @@ import os
 import pandas as pd
 
 from pandas import DataFrame
+from config import __BASE_PATH__
 
 
 # 获取指定产品的日K/周K
@@ -42,7 +43,7 @@ def stock_data_obtainer(
         stock_df.set_index("日期", inplace=True)
 
         # 数据路径
-        data_path = "goInvest\\data\\kline"
+        data_path = f"{__BASE_PATH__}\\data\\stock\\{stock_code}\\kline"
 
         # 删除过往重复数据
         for file_name in os.listdir(data_path):

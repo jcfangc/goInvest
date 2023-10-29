@@ -4,10 +4,10 @@ import datetime as dt
 import os
 import pandas as pd
 
-
 from pandas import DataFrame
-from goInvest.utils import data_obtainer as do
+from utils import data_obtainer as do
 from utils.enumeration_label import ProductType, IndicatorName
+from config import __BASE_PATH__
 
 
 class dataPicker:
@@ -35,7 +35,9 @@ class dataPicker:
         }
 
         # 定义数据源文件夹路径
-        data_path = "goInvest\\data\\kline"
+        data_path = (
+            f"{__BASE_PATH__}\\data\\{product_type.value}\\{product_code}\\kline"
+        )
         # 查询目标文件夹是否存在相关数据
         # 如果不存在相关数据，自行获取
         for file_name in os.listdir(data_path):
@@ -58,7 +60,8 @@ class dataPicker:
                             )
 
         # 检查字典内的数据是不是都是空的DataFrame，如果是，自行获取
-        if all(value.empty for value in df_product_dict.values()):
+        if any(value.empty for value in df_product_dict.values()):
+            print(f"发现最新数据缺失，重新获取'{product_code}'所有K线数据...\n")
             if product_type == ProductType.Stock:
                 df_product_dict = do.stock_data_obtainer(
                     stock_code=product_code,
@@ -104,8 +107,9 @@ class dataPicker:
         }
 
         # 数据源文件夹路径
-        indicator_path = "goInvest\\data\\kline\\indicator"
-
+        indicator_path = (
+            f"{__BASE_PATH__}\\data\\{product_type.value}\\{product_code}\\indicator"
+        )
         for file_name in os.listdir(indicator_path):
             # 依次检查日K、周K的数据源是否存在
             for k_period_short in ["D", "W"]:
@@ -133,7 +137,7 @@ class dataPicker:
         # 检查字典内的数据是不是都是空的DataFrame，如果是，自行获取
         if all(value.empty for value in dict_indicator.values()):
             if indicator_name == IndicatorName.Boll:
-                from utils.indicator import myBoll
+                from indicator import myBoll
 
                 dict_indicator = myBoll.MyBoll(
                     None,
@@ -143,7 +147,7 @@ class dataPicker:
                     product_df_dict=product_df_dict,
                 ).calculate_indicator()
             elif indicator_name == IndicatorName.SMA:
-                from utils.indicator import mySMA
+                from indicator import mySMA
 
                 dict_indicator = mySMA.MySMA(
                     None,
@@ -153,7 +157,7 @@ class dataPicker:
                     product_df_dict=product_df_dict,
                 ).calculate_indicator()
             elif indicator_name == IndicatorName.EMA:
-                from utils.indicator import myEMA
+                from indicator import myEMA
 
                 dict_indicator = myEMA.MyEMA(
                     None,
@@ -163,7 +167,7 @@ class dataPicker:
                     product_df_dict=product_df_dict,
                 ).calculate_indicator()
             elif indicator_name == IndicatorName.RSI:
-                from utils.indicator import myRSI
+                from indicator import myRSI
 
                 dict_indicator = myRSI.MyRSI(
                     None,

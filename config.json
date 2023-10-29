@@ -1,0 +1,16 @@
+{
+    "dataDirectoryStructure": {
+        "E:\\PYTHON\\MyPythonProjects\\goInvest": {
+            "data": {
+                "stock": {
+                    "002230": {
+                        "kline": {},
+                        "indicator": {},
+                        "strategy": {},
+                        "test": {}
+                    }
+                }
+            }
+        }
+    }
+}

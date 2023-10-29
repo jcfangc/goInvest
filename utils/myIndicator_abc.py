@@ -1,13 +1,10 @@
 """myIndicator_abc.py 扮演一个接口，写一些指标中共性功能"""
-if __name__ == "__main__":
-    from __init__ import goInvest_path
-else:
-    from .indicator import goInvest_path
 
 from abc import ABC, abstractmethod
 from pandas import DataFrame
 from utils import dataSource_picker as dp
 from utils.enumeration_label import ProductType, IndicatorName
+from config import __BASE_PATH__
 
 import datetime as dt
 import os
@@ -25,7 +22,9 @@ class MyIndicator(ABC):
     ) -> None:
         if data_path is None:
             # 默认路径
-            self.data_path = f"{goInvest_path}\\data\\kline\\indicator"
+            self.data_path = (
+                f"{__BASE_PATH__}\\data\\{product_type.value}\\{product_code}"
+            )
         else:
             self.data_path = data_path
         if today_date is None:
@@ -93,7 +92,7 @@ class MyIndicator(ABC):
                 df_dict[period].fillna(value=0.0, inplace=True)
             # 输出字典到csv文件
             with open(
-                file=f"{self.data_path}\\{self.product_code}{period[0].upper()}_{self.today_date.strftime('%m%d')}_{self.indicator_name.value}.csv",
+                file=f"{self.data_path}\\indicator\\{self.product_code}{period[0].upper()}_{self.today_date.strftime('%m%d')}_{self.indicator_name.value}.csv",
                 mode="w",
                 encoding="utf-8",
             ) as f:

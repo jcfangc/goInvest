@@ -3,10 +3,10 @@
 import datetime as dt
 import pandas as pd
 
-from . import goInvest_path
-from . import dataSource_picker as dp
-from utils.enumeration_label import ProductType
-from utils.indicator import myBoll, myEMA, mySMA
+from config import __BASE_PATH__
+from utils import dataSource_picker as dp
+from enumeration_label import ProductType
+from indicator import myBoll, myEMA, mySMA
 
 
 class StockAnalyst:
@@ -88,7 +88,7 @@ class StockAnalyst:
 
         # 输出综合的买入卖出建议为csv文件，在strategy文件夹中
         with open(
-            file=f"{goInvest_path}\\goInvest\\data\\kline\\indicator\\strategy\\{self.product_code}_comprehensive_anlysis.csv",
+            file=f"{__BASE_PATH__}\\data\\{self.product_type.value}\\{self.product_code}\\strategy\\{self.product_code}_comprehensive_anlysis.csv",
             mode="w",
             encoding="utf-8",
         ) as f:
