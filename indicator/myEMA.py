@@ -1,5 +1,12 @@
 """myEMA.py"""
 
+if __name__ == "__main__":
+    import sys
+    import os
+
+    # 将上级目录加入sys.path
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[0]))))
+
 
 import datetime as dt
 import pandas as pd
@@ -7,28 +14,28 @@ import pandas as pd
 from pandas import DataFrame
 from utils.myIndicator_abc import MyIndicator
 from utils.enumeration_label import ProductType, IndicatorName
+from typing import Optional
+
+# 本指标的参数
+params = {}
 
 
 class MyEMA(MyIndicator):
     def __init__(
         self,
-        data_path: str | None,
-        today_date: dt.date | None,
+        data_path: Optional[str],
+        today_date: Optional[dt.date],
         product_code: str,
         product_type: ProductType,
-        product_df_dict: dict[str, DataFrame] | None,
+        product_df_dict: Optional[dict[str, DataFrame]],
     ) -> None:
+        params["today_date"] = today_date
+        params["product_code"] = product_code
+        params["product_type"] = product_type
+        params["product_df_dict"] = product_df_dict
         super().__init__(
-            data_path=data_path,
-            today_date=today_date,
-            product_code=product_code,
-            product_type=product_type,
-            indicator_name=IndicatorName.EMA,
-            product_df_dict=product_df_dict,
+            data_path=data_path, indicator_name=IndicatorName.EMA, **params
         )
-
-    def _remove_redundant_files(self) -> None:
-        super()._remove_redundant_files()
 
     def calculate_indicator(self) -> dict[str, DataFrame]:
         """
@@ -37,27 +44,36 @@ class MyEMA(MyIndicator):
         print(f"正在计算{self.product_code}指数移动平均线...")
 
         # 清理重复文件
-        self._remove_redundant_files()
+        super()._remove_redundant_files()
 
-        # 定义一个字典，用于存放返回的不同周期sma数据
+        # 本指标的参数
+        default_indicator_config_value = {"span_list": [5, 10, 20, 50, 150]}
+        indicator_config_value = (
+            super().read_from_config(None) or default_indicator_config_value
+        )
+
+        # 定义一个字典，用于存放返回的不同周期ema数据
         df_ema_dict = {
             "daily": DataFrame(),
             "weekly": DataFrame(),
         }
 
-        # 根据数据和时间窗口滚动计算SMA
+        span_list = indicator_config_value["span_list"]
+        # 从小到大排序
+        span_list.sort()
+        # 根据数据和时间窗口滚动计算ema
         for period in ["daily", "weekly"]:
             closing_price = self.product_df_dict[period]["收盘"]
             # 5时间窗口，数值取三位小数
-            ema_5 = closing_price.ewm(span=5, adjust=False).mean()
+            ema_5 = closing_price.ewm(span=span_list[0], adjust=False).mean()
             # 10时间窗口，数值取三位小数
-            ema_10 = closing_price.ewm(span=10, adjust=False).mean()
+            ema_10 = closing_price.ewm(span=span_list[1], adjust=False).mean()
             # 20时间窗口，数值取三位小数
-            ema_20 = closing_price.ewm(span=20, adjust=False).mean()
+            ema_20 = closing_price.ewm(span=span_list[2], adjust=False).mean()
             # 50时间窗口，数值取三位小数
-            ema_50 = closing_price.ewm(span=50, adjust=False).mean()
+            ema_50 = closing_price.ewm(span=span_list[3], adjust=False).mean()
             # 150时间窗口，数值取三位小数
-            ema_150 = closing_price.ewm(span=150, adjust=False).mean()
+            ema_150 = closing_price.ewm(span=span_list[4], adjust=False).mean()
 
             # 均线数据汇合
             df_ema_dict[period] = DataFrame(
@@ -73,18 +89,21 @@ class MyEMA(MyIndicator):
             )
 
         # 保存指标
-        super().save_indicator(df_dict=df_ema_dict)
+        super().save_indicator(
+            df_dict=df_ema_dict, indicator_value_config_dict=indicator_config_value
+        )
         # 返回字典
         return df_ema_dict
 
     def analyze(self) -> list[DataFrame]:
         # 获取股票K线EMA数据
-        dict_ema = super().pre_analyze()
+        dict_ema = super().get_dict()
         # 调用策略函数
-        sma_mutiline_judge = self._mutiline_strategy(dict_ema)
+        ema_mutiline_judge = self._mutiline_strategy(dict_ema)
         # 返回策略
-        return [sma_mutiline_judge]
+        return [ema_mutiline_judge]
 
+    # 策略函数名请轻易不要修改！！！若修改，需要同时修改枚举类内的StrategyName！！！
     def _mutiline_strategy(
         self,
         dict_ema: dict[str, DataFrame],
@@ -98,8 +117,15 @@ class MyEMA(MyIndicator):
         如果收盘价格跌破50均线，决策值设为-1\n
         """
 
+        # 策略参数
+        default_strategy_config_value = {"expect_list": [-1, -0.95, -0.85, -0.65]}
+        strategy_config_value = (
+            super().read_from_config(MyEMA._mutiline_strategy.__name__)
+            or default_strategy_config_value
+        )
+
         # 创建一个空的DataFrame
-        # 第一列为“日期”索引，第二列（daily）第三列（weekly）为-1至1的SMA判断值
+        # 第一列为“日期”索引，第二列（daily）第三列（weekly）为-1至1的ema判断值
         df_ema_judge = DataFrame(
             index=dict_ema["daily"].index, columns=["daily", "weekly"]
         )
@@ -118,14 +144,14 @@ class MyEMA(MyIndicator):
 
         for period in dict_ema.keys():
             ema_data = dict_ema[period]
-            # print(sma_data.head(50))
+            # print(ema_data.head(50))
             # 上涨态势的判断
             # 5均线大于10均线，10均线大于20均线，20均线大于50均线，50均线大于150均线
             up_trend = ema_data[
-                (ema_data["5均线"] > ema_data["10均线"])
-                & (ema_data["10均线"] > ema_data["20均线"])
-                & (ema_data["20均线"] > ema_data["50均线"])
-                & (ema_data["50均线"] > ema_data["150均线"])
+                (ema_data.iloc[:, 0] > ema_data.iloc[:, 1])
+                & (ema_data.iloc[:, 1] > ema_data.iloc[:, 2])
+                & (ema_data.iloc[:, 2] > ema_data.iloc[:, 3])
+                & (ema_data.iloc[:, 3] > ema_data.iloc[:, 4])
             ].index
             # 确保up_trend是时间格式
             up_trend = pd.to_datetime(up_trend)
@@ -191,32 +217,35 @@ class MyEMA(MyIndicator):
                 # 表示收盘价
                 close_price = ohlc_data[period]["收盘"].loc[date]
                 # 表示50均线
-                ema_50 = ema_data["50均线"].loc[date]
+                ema_50 = ema_data.iloc[:, 3].loc[date]
                 # 表示20均线
-                ema_20 = ema_data["20均线"].loc[date]
+                ema_20 = ema_data.iloc[:, 2].loc[date]
                 # 表示10均线
-                ema_10 = ema_data["10均线"].loc[date]
+                ema_10 = ema_data.iloc[:, 1].loc[date]
                 # 表示5均线
-                ema_5 = ema_data["5均线"].loc[date]
+                ema_5 = ema_data.iloc[:, 0].loc[date]
 
+                expect_list = strategy_config_value["expect_list"]
                 # 如果收盘价跌破50均线，决策值设为-1
                 if close_price <= ema_50:  # type: ignore
-                    df_ema_judge.loc[date, period] = -1
+                    df_ema_judge.loc[date, period] = expect_list[0]  # config
                 # 如果收盘价跌破20均线，决策值设为-0.95
                 elif close_price <= ema_20:  # type: ignore
-                    df_ema_judge.loc[date, period] = -0.95
+                    df_ema_judge.loc[date, period] = expect_list[1]  # config
                 # 如果收盘价跌破10均线，决策值设为-0.85
                 elif close_price <= ema_10:  # type: ignore
-                    df_ema_judge.loc[date, period] = -0.85
+                    df_ema_judge.loc[date, period] = expect_list[2]  # config
                 # 如果收盘价跌破5均线，决策值设为-0.65
                 elif close_price <= ema_5:  # type: ignore
-                    df_ema_judge.loc[date, period] = -0.65
+                    df_ema_judge.loc[date, period] = expect_list[3]  # config
                 else:
                     continue
 
         # 保存策略
         super().save_strategy(
-            df_judge=df_ema_judge, func_name=MyEMA._mutiline_strategy.__name__
+            df_judge=df_ema_judge,
+            func_name=MyEMA._mutiline_strategy.__name__,
+            strategy_config_value_dict=strategy_config_value,
         )
         # 返回策略
         return df_ema_judge
@@ -224,6 +253,4 @@ class MyEMA(MyIndicator):
 
 if __name__ == "__main__":
     # 调用函数stock_EMA
-    MyEMA(
-        None, dt.date.today(), "002230", ProductType.Stock, None
-    ).calculate_indicator()
+    MyEMA(None, dt.date.today(), "002230", ProductType.Stock, None).analyze()

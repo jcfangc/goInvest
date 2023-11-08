@@ -1,13 +1,87 @@
 {
+    "ValueInCalculation": {
+        "Boll": {
+            "time_window": 10,
+            "k": 2,
+            "_boll_strategy": {
+                "strategy_name": "_boll_strategy",
+                "up_track_value_list": [
+                    -1,
+                    -0.95,
+                    -0.75,
+                    -0.5,
+                    -0.25
+                ],
+                "down_track_value_list": [
+                    1,
+                    0.8,
+                    0.6,
+                    0.4,
+                    0.2
+                ]
+            }
+        },
+        "SMA": {
+            "span_list": [
+                5,
+                10,
+                20,
+                50,
+                150
+            ],
+            "_mutiline_strategy": {
+                "strategy_name": "_mutiline_strategy",
+                "expect_list": [
+                    -1,
+                    -0.95,
+                    -0.85,
+                    -0.65
+                ]
+            }
+        },
+        "EMA": {
+            "span_list": [
+                5,
+                10,
+                20,
+                50,
+                150
+            ],
+            "_mutiline_strategy": {
+                "strategy_name": "_mutiline_strategy",
+                "expect_list": [
+                    -1,
+                    -0.95,
+                    -0.85,
+                    -0.65
+                ]
+            }
+        },
+        "SRLine": {
+            "threshold": 0.05,
+            "_pressure_area_strategy": {
+                "strategy_name": "_pressure_area_strategy",
+                "area_num": 20
+            }
+        }
+    },
     "dataDirectoryStructure": {
         "E:\\PYTHON\\MyPythonProjects\\goInvest": {
             "data": {
                 "stock": {
+                    "600418": {
+                        "kline": {},
+                        "indicator": {},
+                        "strategy": {},
+                        "test": {},
+                        "plot": {}
+                    },
                     "002230": {
                         "kline": {},
                         "indicator": {},
                         "strategy": {},
-                        "test": {}
+                        "test": {},
+                        "plot": {}
                     }
                 }
             }

@@ -16,7 +16,8 @@ import matplotlib.dates as mdates
 from pandas import DataFrame, Series
 from utils import dataSource_picker as dsp
 from scipy.ndimage import gaussian_filter
-from utils.enumeration_label import ProductType, SeriesOperation
+from utils.enumeration_label import ProductType
+from typing import Optional
 
 
 class DataFunctionalizer:
@@ -28,16 +29,13 @@ class DataFunctionalizer:
         df_product_dict: dict[str, DataFrame] | None,
     ):
         self.product_code = product_code
-        self.today_date = today_date if today_date is not None else dt.date.today()
+        self.today_date = today_date or dt.date.today()
         self.product_type = product_type
-        if df_product_dict is not None:
-            self.df_product_dict = df_product_dict
-        else:
-            self.df_product_dict = dsp.dataPicker.product_source_picker(
-                product_code=self.product_code,
-                today_date=self.today_date,
-                product_type=self.product_type,
-            )
+        self.df_product_dict = df_product_dict or dsp.dataPicker.product_source_picker(
+            product_code=self.product_code,
+            today_date=self.today_date,
+            product_type=self.product_type,
+        )
         self.standard_daily_index = self.df_product_dict["daily"].index
         self.standard_weekly_index = self.df_product_dict["weekly"].index
 
@@ -74,38 +72,10 @@ class DataFunctionalizer:
                         f"{index}的数据类型为{type(value)}，应为{the_type}，无法进行操作，调用函数为{call_name}"
                     )
 
-    def series_operator(
-        self,
-        data_series: Series,
-        sigma: float,
-        operation: SeriesOperation,
-        plot: bool | None = False,
-    ) -> Series:
-        return_series = Series(index=data_series.index)
-
-        match operation:
-            case SeriesOperation.Smoother:
-                return_series = DataFunctionalizer.smoother_operation(
-                    data_series=data_series, sigma=sigma, plot=plot
-                )
-
-            case SeriesOperation.InflectionPoint:
-                return_series = DataFunctionalizer.inflection_point_operation(
-                    data_series=data_series, sigma=sigma, plot=plot
-                )
-
-            case SeriesOperation.Refine:
-                return_series = DataFunctionalizer.refine_operation(
-                    data_series=data_series, plot=plot
-                )
-
-        return return_series
-
     @staticmethod
-    def smoother_operation(
+    def smoother_series(
         data_series: Series,
-        sigma: float,
-        plot: bool | None = False,
+        sigma: float,  # config
     ) -> Series:
         """
         平滑数据，sigma：越大去噪效果越强，细节越少
@@ -115,7 +85,7 @@ class DataFunctionalizer:
         DataFunctionalizer._checking(
             the_type=float,
             data_series=data_series,
-            call_name=DataFunctionalizer.smoother_operation.__name__,
+            call_name=DataFunctionalizer.smoother_series.__name__,
         )
 
         # 转换为 NumPy 数组
@@ -123,28 +93,13 @@ class DataFunctionalizer:
         # 使用高斯滤波器平滑数据
         smoothed_array = gaussian_filter(data_array, sigma=sigma)
         # 将结果转换回 Series
-        return_series = smoothed_series = Series(
-            smoothed_array, index=data_series.index
-        )
-        if plot:
-            # 返回平滑后的数据
-            smoothed_series.plot(label="Smoothed Data")
-            # 绘制
-            try:
-                data_series.plot(label="Raw Data", alpha=0.5)
-                plt.legend()
-                plt.show()
-            except TypeError:
-                plt.legend()
-                plt.show()
+        return_series = Series(smoothed_array, index=data_series.index)
 
         # 返回结果
         return return_series
 
     @staticmethod
-    def inflection_point_operation(
-        data_series: Series, sigma: float, plot: bool | None = False
-    ) -> Series:
+    def inflection_point_series(data_series: Series, sigma: float) -> Series:  # config
         """
         寻找拐点\n
         输入的series数据应该为浮点型\n
@@ -155,7 +110,7 @@ class DataFunctionalizer:
         DataFunctionalizer._checking(
             the_type=float,
             data_series=data_series,
-            call_name=DataFunctionalizer.inflection_point_operation.__name__,
+            call_name=DataFunctionalizer.inflection_point_series.__name__,
         )
 
         # 转换为 NumPy 数组
@@ -164,8 +119,7 @@ class DataFunctionalizer:
         smoothed_array = gaussian_filter(data_array, sigma=sigma)
         # 将结果转换回 Series
         smoothed_series = Series(smoothed_array, index=data_series.index, name="平滑数据")
-        if plot:
-            smoothed_series.plot(label="Smoothed Data")
+
         # 滚动计算平滑后两点之间的斜率
         slope_series = Series(index=data_series.index)
         for i in range(1, len(smoothed_array)):
@@ -192,53 +146,52 @@ class DataFunctionalizer:
         return_series.sort_index(inplace=True)
         # 保留四位小数
         return_series = return_series.apply(lambda x: round(x, 4))
-        if plot:
-            # 绘图准备（点图）
-            plt.scatter(
-                return_series.index,
-                Series(return_series.values),
-                label="Inflection Point",
-                color="red",
-                alpha=0.3,
-            )
-            # 绘制
-            try:
-                data_series.plot(label="Raw Data", alpha=0.5)
-                plt.legend()
-                plt.show()
-            except TypeError:
-                plt.legend()
-                plt.show()
+
+        # # 绘图准备（点图）
+        # smoothed_series.plot(label="Smoothed Data")
+        # plt.scatter(
+        #     return_series.index,
+        #     Series(return_series.values),
+        #     label="Inflection Point",
+        #     color="red",
+        #     alpha=0.3,
+        # )
+        # # 绘制
+        # try:
+        #     data_series.plot(label="Raw Data", alpha=0.5)
+        #     plt.legend()
+        #     plt.show()
+        # except TypeError:
+        #     plt.legend()
+        #     plt.show()
 
         # 返回结果
         return return_series
 
     @staticmethod
-    def refine_operation(data_series: Series, plot: bool | None = False) -> Series:
+    def refine_seires(data_series: Series) -> Series:
         """
-        精炼数据，将粘连数据合并\n
-        输入的series数据应该为bool类型，True为粘连数据，False为非粘连数据\n
-        返回的series数据为bool类型，True为精炼数据点，False为非精炼数据点\n
+        精炼数据，将临近数据合并\n
+        输入的series数据应该为bool类型，True为临近数据，False为非临近数据\n
+        返回的series数据为bool类型，True为精炼数据点，False为普通数据点\n
+        精炼的本质是使用特定的卷积核进行卷积，卷积核由积分窗口决定\n
         """
 
         # 检查
         DataFunctionalizer._checking(
             the_type=bool,
             data_series=data_series,
-            call_name=DataFunctionalizer.refine_operation.__name__,
+            call_name=DataFunctionalizer.refine_seires.__name__,
         )
 
         # 积分窗口
         accumulation_window = int(len(data_series) * 0.005)
-
-        # 积分列表
-        accumulation_list = []
-        for i in range(1, int(accumulation_window / 2)):
-            accumulation_list.append(i)
-        for i in range(int(accumulation_window / 2), 0, -1):
-            accumulation_list.append(i)
-
-        # print(accumulation_list)
+        # 卷积核：[1,2,3...,accumulation_window//2,...3,2,1]
+        convolution_kernel = []
+        for i in range(1, accumulation_window // 2):
+            convolution_kernel.append(i)
+        for i in range(accumulation_window // 2, 0, -1):
+            convolution_kernel.append(i)
 
         # 创建DataFrame作为积分表格
         accumulation_df = DataFrame(index=data_series.index, columns=["value"])
@@ -253,25 +206,21 @@ class DataFunctionalizer:
         glue_df_index = accumulation_df[accumulation_df["日期"].isin(glue_index)].index
         # print(glue_df_index)
 
-        # 对所有粘连数据的进行处理
+        # 对所有粘连数据的进行处理：这一步本质上是在计算卷积
         for gdi in glue_df_index:
-            for i in range(len(accumulation_list)):
+            for i in range(len(convolution_kernel)):
                 # 判断积分值的下标是否在积分表格的范围内
-                if (gdi - len(accumulation_list) // 2 + i >= 0) and (
-                    gdi - len(accumulation_list) // 2 + i < len(data_series)
+                if (gdi - len(convolution_kernel) // 2 + i >= 0) and (
+                    gdi - len(convolution_kernel) // 2 + i < len(data_series)
                 ):
                     accumulation_df.loc[
-                        gdi - len(accumulation_list) // 2 + i, "value"
-                    ] += accumulation_list[i]
+                        gdi - len(convolution_kernel) // 2 + i, "value"
+                    ] += convolution_kernel[i]
 
         # 将积分值转换为Series
         accumulation_series = Series(
             accumulation_df["value"].values, index=accumulation_df["日期"]
         )
-
-        if plot:
-            # 绘制
-            accumulation_series.plot(label="Accumulation", alpha=0.5)
 
         # 根据积分数据进行精炼，非零积分值从前往后两两相减
         differ_dataframe = DataFrame(
@@ -291,7 +240,7 @@ class DataFunctionalizer:
                     accumulation_series[i] - accumulation_series[i - 1]
                 )
         # 根据差值判断精炼类型
-        height = sum(accumulation_list)
+        height = sum(convolution_kernel)
         for i in differ_dataframe.index:
             if (i - 1) in differ_dataframe.index:
                 # 精炼类型一："tip"
@@ -343,165 +292,171 @@ class DataFunctionalizer:
         # 将精炼值转换为Series
         return_series = differ_dataframe["精炼值"]
 
-        if plot:
-            # 绘制
-            try:
-                data_series.plot(label="Raw Data", alpha=0.5)
-                plt.legend()
-                plt.show()
-            except TypeError:
-                plt.legend()
-                plt.show()
+        # # 绘制
+        # accumulation_series.plot(label="Accumulation", alpha=0.5)
+        # try:
+        #     data_series.plot(label="Raw Data", alpha=0.5)
+        #     plt.legend()
+        #     plt.show()
+        # except TypeError:
+        #     plt.legend()
+        #     plt.show()
 
         return return_series
 
-    # 本函数依赖于standard_daily_index和standard_weekly_index，所以不可能是静态方法
-    def _vibration_merge_operation(
-        self, data_series: Series, plot: bool | None = False
-    ) -> Series:
-        """将震荡造成的粘连数据合并"""
+    @staticmethod
+    def shearing_and_recover(
+        data_series: Series, coeff: Optional[np.ndarray] = None
+    ) -> tuple[Series, np.ndarray] | Series:
+        """
+        将数据拟合到x轴上，本质上是进行平移和剪切的线性变换。
+
+        参数：
+        - data_series (pd.Series): 输入的数据序列，应为浮点数。
+        - coeff (Optional[np.ndarray], optional): 逆变换的依据，一组函数系数。如果为None，将进行线性变换的逆变换。
+
+        返回值：
+        - 如果 coeff 为 None，返回一个元组，包含两个值：
+            1. 拟合到 x 轴上后的数据序列，为浮点数。
+            2. 逆变换的依据，一组函数系数（空数组）。
+        - 如果 coeff 不为 None，返回一个序列，为还原后的数据，为浮点数。
+        """
 
         # 检查
         DataFunctionalizer._checking(
+            the_type=float,
             data_series=data_series,
-            call_name=DataFunctionalizer._vibration_merge_operation.__name__,
-            the_type=None,
-            numeric=True,
+            call_name=DataFunctionalizer.shearing_and_recover.__name__,
         )
 
-        # series中的值两两相差
-        differ_series = data_series.diff()
-        print(f"差值：{differ_series}")
-
-        return Series()
-
-    @staticmethod
-    def trend_transform(
-        dates: np.ndarray,
-        y_axis: np.ndarray,
-        coefficients: np.ndarray,
-        plot: bool | None = False,
-    ) -> np.ndarray:
-        """
-        如果需要将k线数据的趋势影响消除，可以尝试使用本函数用于对数据进行线性变换\n
-        dates: 当前要处理的x轴（日期）数据\n
-        y_axis: 当前要处理的y轴数据\n
-        coefficients: \n
-        当该参数所代表的一次函数的斜率和截距为0时，表示将原数据进行平移和剪切变换，使其躺倒在x轴上\n
-        即先根据截距进行平移变换使得一次函数经过原点，然后根据斜率进行剪切变换使得一次函数躺倒在x轴\n
-        当该参数做代表的一次函数的斜率和截距为非零时，表示将当前数据根据斜率和截距进行变换\n
-        即先根据斜率进行剪切变换，然后根据截距进行平移变换\n
-        plot: 是否绘制图形，默认不绘制\n
-        返回值: 变换后的x和y轴数据
-        """
+        # 转换为 NumPy 数组
+        data_array = np.array(data_series.values)
         try:
-            # 生成x轴数据
-            x_axis = np.array([mdates.date2num(date) for date in dates])
+            # 将日期转化为数字，并变为np数组
+            num_dates = np.array([mdates.date2num(date) for date in data_series.index])
         except TypeError:
             raise TypeError("日期数据类型错误，无法转换为matplotlib的日期格式")
 
-        # 斜率
-        slope = coefficients[0]
-        # 截距
-        intercept = coefficients[1]
-
-        if slope == 0 and intercept == 0:
-            # 获得数据对应的一次函数参数
-            data_coefficients = np.polyfit(x_axis, y_axis, deg=1)
-            data_slope = data_coefficients[0]
-            data_intercept = data_coefficients[1]
-
-            # 平移变换
-            transformed_pairs = np.column_stack((x_axis, y_axis))
-            transformed_pairs[:, 1] = transformed_pairs[:, 1] - data_intercept
-            # 平移后的一次函数参数，经实验截距为0
-            transformed_coefficients = [data_slope, 0]
-
-            # 剪切变换
-            # 取原一次函数的最后一个坐标点，计算剪切因子k
-            x, y = np.array(
-                [x_axis[-1], np.polyval(transformed_coefficients, x_axis[-1])]
-            )
-            # 计算剪切因子k
-            try:
-                k = (-y) / x
-            except ZeroDivisionError:
-                raise ZeroDivisionError("最后一点是原点数据，无法计算剪切因子k")
-            # 创建剪切矩阵
-            shearing_matrix = np.array([[1, k], [0, 1]])
-
-            # 数据进行线性变换
-            transformed_data_points = np.array(
-                [np.matmul(point, shearing_matrix) for point in transformed_pairs]
-            )
-
-            # 画出拟合的直线和数据
-            if plot:
-                plt.plot(dates, y_axis, label="Smoothed Data")
-                plt.plot(
-                    dates,
-                    data_slope * x_axis + data_intercept,
-                    label="Trend Line",
-                )
-                plt.plot(dates, transformed_data_points[:, 1], label="Transformed Data")
-                # 画出y=0的直线
-                plt.plot(dates, np.zeros(len(dates)), label="Transformed Trend Line")
-                plt.legend()
-                plt.show()
-
-            # x轴数据转换为日期
-            # transformed_data_points[:, 0] = np.array(dates)
-
-            return transformed_data_points
-
-        # 逆变换
+        # 拟合函数并记录系数
+        if coeff is None:
+            coefficients = np.polyfit(x=num_dates, y=data_array, deg=5)  # config
         else:
-            original_coefficients = coefficients
-            transformed_data_points = np.column_stack((x_axis, y_axis))
-            # 剪切变换
-            temp_coefficients = [original_coefficients[0], 0]
-            # 取原一次函数的最后一个坐标点，计算剪切因子k
-            x, y = np.array([x_axis[-1], np.polyval(temp_coefficients, x_axis[-1])])
+            coefficients = coeff
+        fitted_value = np.polyval(coefficients, num_dates)
+        # 取拟合曲线的最低点
+        minimum_index = np.argmin(fitted_value)
+        # print(minimum_index)
+
+        # 拟合函数最低点纵坐标
+        minimum_y = fitted_value[minimum_index]
+        # 平移数据
+        shifted_fitted_value = (
+            fitted_value - minimum_y if coeff is None else fitted_value + minimum_y
+        )
+        shifted_data_array = (
+            data_array - minimum_y if coeff is None else data_array + minimum_y
+        )
+        # 用shifted_data_array和num_dates表示数据点
+        points = np.column_stack((num_dates, shifted_data_array))
+
+        # 计算剪切因子k
+        k_list = []
+        for x in num_dates:
+            # np.where返回的是一个元组，所以要加[0]
+            y1 = (
+                0
+                if coeff is None
+                else shifted_fitted_value[np.where(num_dates == x)][0]
+            )
+            x2 = x
+            y2 = (
+                shifted_fitted_value[np.where(num_dates == x)][0]
+                if coeff is None
+                else 0
+            )
             # 计算剪切因子k
-            try:
-                k = (-y) / x
-            except ZeroDivisionError:
-                raise ZeroDivisionError("最后一点是原点数据，无法计算剪切因子k")
-            # 创建剪切矩阵
-            anti_shearing_matrix = np.array([[1, -k], [0, 1]])
-            original_data_points = [
-                np.matmul(point, anti_shearing_matrix)
-                for point in transformed_data_points
-            ]
-            original_data_points = np.array(original_data_points)
+            k = (y1 - y2) / x2
+            k_list.append(k)
 
-            # 平移变换
-            original_data_points[:, 1] = original_data_points[:, 1] + intercept
+        # 剪切变换：数据点逐一和对应的剪切矩阵相乘
+        # 创建一个空的形状为 (N, 2) 的数组
+        new_points_list = []
+        for index, k in enumerate(k_list):
+            transform_matrix = np.array([[1, 0], [k, 1]])
+            new_point = np.matmul(transform_matrix, points[index])
+            # sheared_point = points[index]
+            new_points_list.append(new_point)
 
-            # 画出拟合的直线和数据
-            if plot:
-                plt.plot(dates, y_axis, label="Transformed Data")
-                plt.plot(dates, np.zeros(len(x_axis)), label="Transformed Trend Line")
-                plt.plot(dates, original_data_points[:, 1], label="Original Data")
-                plt.plot(
-                    dates,
-                    np.polyval(original_coefficients, x_axis),
-                    label="Original Trend Line",
-                )
-                plt.legend()
-                plt.show()
+        # 将列表转换为数组
+        new_points = np.array(new_points_list)
 
-            # x轴数据转换为日期
-            # original_data_points[:, 0] = np.array(dates)
+        # plt.plot(
+        #     data_series.index, new_points[:, 1], label="New Data"
+        # )  # 所有行第1列，column_stack将点的横坐标和纵坐标分别放在两列，纵向拼接
+        # plt.plot(data_series.index, data_array, label="Raw Data")
+        # if coeff is None:
+        #     plt.plot(
+        #         data_series.index,
+        #         fitted_value,
+        #         label="Raw Linear Fitting",
+        #     )
+        # plt.legend()
+        # plt.show()
 
-            return original_data_points
+        return_series = Series(new_points[:, 1], index=data_series.index)
+        return_series = return_series.apply(lambda x: round(x, 4))
 
-    # @staticmethod
-    # def check_interweave(
-    #     main_series: Series,
-    #     sub_series: Series,
-    #     direction: bool,
-    # )->Series:
+        if coeff is None:
+            return return_series, coefficients
+        else:
+            return return_series
+
+    @staticmethod
+    def check_cross(
+        main_series: Series,
+        sub_series: Series,
+    ) -> Series:
+        """
+        检查两条序列的交叉情况\n
+        - 参数：\n
+            - main_series: 主序列，应为浮点数，index为日期\n
+            - sub_series: 副序列，应为浮点数，index为日期\n
+        - 返回值：\n
+            - 返回一个序列，为交叉点，为日期\n
+        """
+
+        # 检查
+        for data_series in [main_series, sub_series]:
+            DataFunctionalizer._checking(
+                the_type=float,
+                data_series=data_series,
+                call_name=DataFunctionalizer.check_cross.__name__,
+            )
+
+        cross_list = []
+
+        # 取较短序列的长度
+        length = min(len(main_series), len(sub_series))
+
+        # 检查是否存在交叉点
+        for i in range(0, length - 1):
+            j = i + 1
+            # 上穿
+            if (main_series[i] > sub_series[i]) and (main_series[j] <= sub_series[j]):
+                cross_list.append(main_series.index[j])
+                continue
+            # 下穿
+            if (main_series[i] < sub_series[i]) and (main_series[j] >= sub_series[j]):
+                cross_list.append(main_series.index[j])
+                continue
+
+        # 日期从远到近排序
+        cross_list.sort()
+        # 将列表转换为Series
+        return_series = Series(cross_list)
+        # print(return_series.head(20))
+
+        return return_series
 
 
 if __name__ == "__main__":
@@ -512,38 +467,11 @@ if __name__ == "__main__":
         df_product_dict=None,
     )
 
-    # test.data_operator(
-    #     data_series=test.df_product_dict["daily"]["收盘"],
-    #     sigma=50,
-    #     plot=True,
-    #     operation=DataOperation.Smoother,
-    # )
-
-    inflection_point_series = DataFunctionalizer.inflection_point_operation(
-        data_series=test.df_product_dict["daily"]["收盘"], sigma=60, plot=True
+    # 读取E:\PYTHON\MyPythonProjects\goInvest\data\stock\002230\indicator\002230D_1030_SRLine.csv
+    df = pd.read_csv(
+        "E:\\PYTHON\\MyPythonProjects\\goInvest\\data\\stock\\002230\\indicator\\002230D_1030_SRLine.csv",
+        index_col=0,
     )
-
-    bool_series = Series(index=test.df_product_dict["daily"]["收盘"].index)
-    # 初始化bool_series为False
-    bool_series = bool_series.apply(lambda x: False)
-    # 将拐点的index对应的bool_series值设为True
-    bool_series[inflection_point_series.index] = True
-    # 处理好的boolSeries传入refine_operation函数处理精炼
-    refined_series = DataFunctionalizer.refine_operation(
-        data_series=bool_series, plot=True
+    cross = DataFunctionalizer.check_cross(
+        df["支撑线"], test.df_product_dict["daily"]["收盘"]
     )
-    # 取出精炼后的拐点
-    refined_inflection_point_series = inflection_point_series[refined_series]
-    # 绘制
-    plt.scatter(
-        refined_inflection_point_series.index,
-        refined_inflection_point_series,
-        label="Refined Inflection Point",
-        color="red",
-        alpha=0.3,
-    )
-    test.df_product_dict["daily"]["收盘"].plot(label="Raw Data", alpha=0.5)
-    plt.legend()
-    plt.show()
-    # 消除震荡导致的拐点
-    test._vibration_merge_operation(data_series=refined_inflection_point_series)

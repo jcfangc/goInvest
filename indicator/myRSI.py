@@ -5,24 +5,27 @@ import datetime as dt
 from pandas import DataFrame, Series
 from utils.myIndicator_abc import MyIndicator
 from utils.enumeration_label import ProductType, IndicatorName
+from typing import Optional
+
+# 本指标的参数
+params = {}
 
 
 class MyRSI(MyIndicator):
     def __init__(
         self,
-        data_path: str | None,
-        today_date: dt.date | None,
+        data_path: Optional[str],
+        today_date: Optional[dt.date],
         product_code: str,
         product_type: ProductType,
-        product_df_dict: dict[str, DataFrame] | None,
+        product_df_dict: Optional[dict[str, DataFrame]],
     ) -> None:
+        params["today_date"] = today_date
+        params["product_code"] = product_code
+        params["product_type"] = product_type
+        params["product_df_dict"] = product_df_dict
         super().__init__(
-            data_path=data_path,
-            today_date=today_date,
-            product_code=product_code,
-            product_type=product_type,
-            indicator_name=IndicatorName.RSI,
-            product_df_dict=product_df_dict,
+            data_path=data_path, indicator_name=IndicatorName.RSI, **params
         )
 
     def _remove_redundant_files(self) -> None:
@@ -146,12 +149,13 @@ class MyRSI(MyIndicator):
 
     def analyze(self) -> list[DataFrame]:
         # 获取股票K线RSI数据
-        dict_rsi_data = super().pre_analyze()
+        dict_rsi_data = super().get_dict()
         # 调用策略函数
         rsi_obs_strategy = self._over_bought_sold_strategy(dict_rsi_data)
         # 返回策略
         return [rsi_obs_strategy]
 
+    # 策略函数名请轻易不要修改！！！若修改，需要同时修改枚举类内的StrategyName！！！
     def _over_bought_sold_strategy(
         self, dict_rsi_data: dict[str, DataFrame]
     ) -> DataFrame:

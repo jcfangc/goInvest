@@ -29,7 +29,7 @@ def do_logging() -> logging.Logger:
     logger.setLevel(logging.DEBUG)
     # 创建日志格式化器
     formatter = logging.Formatter(
-        fmt="%(asctime)s - %(name)s - %(levelname)s - %(filename)s - %(lineno)d\n%(message)s"
+        fmt="%(asctime)s - %(levelname)s - %(filename)s - %(lineno)d\n%(message)s"
     )
     # 创建流处理器并添加到日志记录器中
     stream_handler = logging.StreamHandler()
@@ -183,6 +183,7 @@ class DirectoryManager:
                 identity_dir.create_subdirectory("indicator")
                 identity_dir.create_subdirectory("strategy")
                 identity_dir.create_subdirectory("test")
+                identity_dir.create_subdirectory("plot")
 
     def update_data_directory_structure_to_json(self) -> None:
         """将data目录下的目录结构更新到config.json文件中"""
@@ -197,7 +198,7 @@ class DirectoryManager:
         with open(f"{__BASE_PATH__}\\config.json", "w") as f:
             json.dump(self.config_data, f, indent=4)
 
-    def struct_compare_with_requirement(self) -> bool:
+    def dir_and_json_compare_with_requirement(self) -> bool:
         """检查data目录下的目录结构是否与requirement中的目录结构一致"""
 
         def check_directory_exist(path):
@@ -207,10 +208,19 @@ class DirectoryManager:
                 return False
             return True
 
+        def check_json_key_exist(key):
+            """辅助函数：检查config.json文件中是否存在相应的键"""
+            if key not in self.config_data.keys():
+                self.logger.debug(f"config.json文件中不存在键 {key}")
+                return False
+            return True
+
         # 检查产品类型目录是否存在
         for product_type in self.requirement["productType"].unique():
             product_path = os.path.join(self.data_full, product_type)
-            if not check_directory_exist(product_path):
+            if not check_directory_exist(product_path) or not check_json_key_exist(
+                product_type
+            ):
                 return False
 
             # 检查具体产品目录是否存在
@@ -218,22 +228,36 @@ class DirectoryManager:
                 self.requirement["productType"] == product_type
             ]["identityCode"]:
                 identity_path = os.path.join(product_path, identity_code)
-                if not check_directory_exist(identity_path):
+                if not check_directory_exist(identity_path) or not check_json_key_exist(
+                    identity_code
+                ):
                     return False
 
                 # 检查具体产品目录下的子目录是否存在
-                for sub_dir in ["kline", "indicator", "strategy", "test"]:
+                for sub_dir in ["kline", "indicator", "strategy", "test", "plot"]:
                     sub_dir_path = os.path.join(identity_path, sub_dir)
-                    if not check_directory_exist(sub_dir_path):
+                    if not check_directory_exist(
+                        sub_dir_path
+                    ) or not check_json_key_exist(sub_dir):
                         return False
 
         return True
 
+    def value_config(self):
+        """确保config.json文件中的键中存在ValueInCalculation键"""
+        self.check_config_json()
+        if "ValueInCalculation" not in self.config_data.keys():
+            # 创建 "ValueInCalculation" 键
+            self.config_data["ValueInCalculation"] = {}
+
     def directoty_manage(self) -> DataFrame:
         """主函数：目录管理"""
 
+        # 检查config.json文件中的键中是否存在ValueInCalculation键
+        self.value_config()
+
         # 检查data目录下的目录结构是否与requirement中的目录结构一致
-        if self.struct_compare_with_requirement() is True:
+        if self.dir_and_json_compare_with_requirement() is True:
             return self.requirement
 
         # 根据requirement.xlsx创建子目录

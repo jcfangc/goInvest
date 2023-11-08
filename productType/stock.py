@@ -5,6 +5,8 @@ from utils import dataSource_picker as dsp
 from utils import data_analyst as da
 from pandas import Series
 from utils.enumeration_label import ProductType
+from utils.enumeration_label import IndicatorName
+from pandas import DataFrame
 
 
 class Stock:
@@ -32,3 +34,48 @@ class Stock:
             stock_code=self.stock_code,
             today_date=self.today_date,
         ).analyze()
+
+    def get_sma(self) -> dict[str, DataFrame]:
+        return dsp.dataPicker.indicator_source_picker(
+            product_code=self.stock_code,
+            today_date=self.today_date,
+            product_type=ProductType.Stock,
+            indicator_name=IndicatorName.SMA,
+            product_df_dict=None,
+        )
+
+    def get_ema(self) -> dict[str, DataFrame]:
+        return dsp.dataPicker.indicator_source_picker(
+            product_code=self.stock_code,
+            today_date=self.today_date,
+            product_type=ProductType.Stock,
+            indicator_name=IndicatorName.EMA,
+            product_df_dict=None,
+        )
+
+    def get_boll(self) -> dict[str, DataFrame]:
+        return dsp.dataPicker.indicator_source_picker(
+            product_code=self.stock_code,
+            today_date=self.today_date,
+            product_type=ProductType.Stock,
+            indicator_name=IndicatorName.Boll,
+            product_df_dict=None,
+        )
+
+    def get_srline(self) -> dict[str, DataFrame]:
+        return dsp.dataPicker.indicator_source_picker(
+            product_code=self.stock_code,
+            today_date=self.today_date,
+            product_type=ProductType.Stock,
+            indicator_name=IndicatorName.SRLine,
+            product_df_dict=None,
+        )
+
+    def get_rsi(self) -> dict[str, DataFrame]:
+        return dsp.dataPicker.indicator_source_picker(
+            product_code=self.stock_code,
+            today_date=self.today_date,
+            product_type=ProductType.Stock,
+            indicator_name=IndicatorName.RSI,
+            product_df_dict=None,
+        )

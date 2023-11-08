@@ -5,8 +5,11 @@ import pandas as pd
 
 from config import __BASE_PATH__
 from utils import dataSource_picker as dp
-from enumeration_label import ProductType
-from indicator import myBoll, myEMA, mySMA
+from utils.enumeration_label import ProductType
+from indicator import myBoll, myEMA, mySMA, mySRLine
+
+# 通用参数
+params = {}
 
 
 class StockAnalyst:
@@ -23,36 +26,20 @@ class StockAnalyst:
             today_date=self.today_date,
             product_type=self.product_type,
         )
+        params["today_date"] = self.today_date
+        params["product_code"] = self.product_code
+        params["product_type"] = self.product_type
+        params["product_df_dict"] = self.product_df_dict
 
     def analyze(self):
         # 移动平均线分析
-        self.result_list = mySMA.MySMA(
-            data_path=None,
-            today_date=self.today_date,
-            product_code=self.product_code,
-            product_type=self.product_type,
-            product_df_dict=self.product_df_dict,
-        ).analyze()
+        self.result_list = mySMA.MySMA(data_path=None, **params).analyze()
         # 指数移动平均线分析
-        self.result_list.extend(
-            myEMA.MyEMA(
-                data_path=None,
-                today_date=self.today_date,
-                product_code=self.product_code,
-                product_type=self.product_type,
-                product_df_dict=self.product_df_dict,
-            ).analyze()
-        )
+        self.result_list.extend(myEMA.MyEMA(data_path=None, **params).analyze())
         # 布林带分析
-        self.result_list.extend(
-            myBoll.MyBoll(
-                data_path=None,
-                today_date=self.today_date,
-                product_code=self.product_code,
-                product_type=self.product_type,
-                product_df_dict=self.product_df_dict,
-            ).analyze()
-        )
+        self.result_list.extend(myBoll.MyBoll(data_path=None, **params).analyze())
+        # 支撑线阻力线分析
+        self.result_list.extend(mySRLine.MySRLine(data_path=None, **params).analyze())
 
         print("开始计算综合分析结果...")
         # 创建一个空的DataFrame，用于存放综合的买入卖出建议
