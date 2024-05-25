@@ -51,45 +51,12 @@ class Plotter:
         params["product_type"] = product_type
         params["product_df_dict"] = product_df_dict
 
-    def plot_all(
-        self,
-        indicator_name_for_strategy: IndicatorName,
-        strategy_name: StrategyName,
-        indicator_names: list[IndicatorName],
-        period: str = "daily",
-        save: bool = True,
-        show: bool = False,
-        from_date: int = 200,
-        to_date: int = 1,
-    ):
-        """绘制所有图"""
-        self.plot_kline(
-            period=period, save=save, show=show, from_date=from_date, to_date=to_date
-        )
-        self.plot_indicator(
-            indicator_names=indicator_names,
-            period=period,
-            save=save,
-            show=show,
-            from_date=from_date,
-            to_date=to_date,
-        )
-        self.plot_strategy(
-            indicator_name=indicator_name_for_strategy,
-            strategy_name=strategy_name,
-            period=period,
-            save=save,
-            show=show,
-            from_date=from_date,
-            to_date=to_date,
-        )
-
     def plot_kline(
         self,
         period: str = "daily",
         save: bool = True,
         show: bool = False,
-        from_date: int = 200,
+        from_date: int = 500,
         to_date: int = 1,
     ) -> Figure:
         """
@@ -120,50 +87,50 @@ class Plotter:
 
     def plot_indicator(
         self,
-        indicator_names: list[IndicatorName],
+        indicator_name: IndicatorName,
         period: str = "daily",
         save: bool = True,
         show: bool = False,
-        from_date: int = 200,
+        from_date: int = 500,
         to_date: int = 1,
-    ) -> list[Figure]:
+    ) -> Figure:
         """
         绘制指标图
-
         - 参数：
             - indicator_names：指标名称列表
             - period：K线周期，可选值为daily、weekly
             - save：是否保存图片，默认为True，保存图片
             - show：是否显示图片，默认为False，不显示图片
         """
-        figs = []
-        for indicator_name in indicator_names:
-            fig, ax = plt.subplots(figsize=(20, 10))
-            # 读取数据
-            data_df = dp.dataPicker.indicator_source_picker(
-                indicator_name=indicator_name, **params
-            )[period][-from_date:-to_date]
-            # 获取数据序号和列名
-            index_list = data_df.index
-            column_list = data_df.columns
-            # 绘制指标图
-            for column in column_list:
-                ax.plot(index_list, data_df[column], label=column, linewidth=0.25)
-            # 设置标题
-            plt.title(f"{self.product_code}_{period}_{indicator_name.value}")
-            # 设置图例
-            plt.legend()
-            figs.append(fig)
-            # 保存图片
-            if save:
-                plt.savefig(
-                    f"{self.data_path}\\plot\\{self.product_code}_{period}_{indicator_name.value}.svg"
-                )
-            # 显示图片
-            if show:
-                plt.show()
 
-        return figs
+        # 防止连续调用时，多个fig对象占用大量内存
+        plt.close("all")
+
+        fig, ax = plt.subplots(figsize=(20, 10))
+        # 读取数据
+        data_df = dp.dataPicker.indicator_source_picker(
+            indicator_name=indicator_name, **params
+        )[period][-from_date:-to_date]
+        # 获取数据序号和列名
+        index_list = data_df.index
+        column_list = data_df.columns
+        # 绘制指标图
+        for column in column_list:
+            ax.plot(index_list, data_df[column], label=column, linewidth=0.25)
+        # 设置标题
+        plt.title(f"{self.product_code}_{period}_{indicator_name.value}")
+        # 设置图例
+        plt.legend()
+        # 保存图片
+        if save:
+            plt.savefig(
+                f"{self.data_path}\\plot\\{self.product_code}_{period}_{indicator_name.value}.svg"
+            )
+        # 显示图片
+        if show:
+            plt.show()
+
+        return fig
 
     def plot_strategy(
         self,
@@ -172,12 +139,26 @@ class Plotter:
         period: str = "daily",
         save: bool = True,
         show: bool = False,
-        from_date: int = 200,
+        from_date: int = 500,
         to_date: int = 1,
+        indicator_saperate: bool = False,
     ) -> Figure:
-        """绘制策略图"""
+        """
+        绘制策略图
+        - 参数：
+            - indicator_name：指标名称
+            - strategy_name：策略名称
+            - period：K线周期，可选值为daily、weekly
+            - save：是否保存图片，默认为True，保存图片
+            - show：是否显示图片，默认为False，不显示图片
+            - from_date：从倒数第from_date天开始绘制，默认为200
+            - to_date：到倒数第to_date天结束绘制，默认为1
+            - indicator_saperate：是否将指标图和K线图分开，默认为False，不分开
+        """
 
-        fig, ax = plt.subplots(figsize=(20, 10))
+        # 防止连续调用时，多个fig对象占用大量内存
+        plt.close("all")
+
         # 读取数据
         strategy_values = dp.dataPicker.strategy_source_picker(
             strategy_name=strategy_name, **params
@@ -188,11 +169,34 @@ class Plotter:
         indicator_df = dp.dataPicker.indicator_source_picker(
             indicator_name=indicator_name, **params
         )[period][-from_date:-to_date]
-        # 绘制指标图
-        for column in indicator_df.columns:
-            ax.plot(
-                indicator_df.index, indicator_df[column], label=column, linewidth=0.25
-            )
+
+        if not indicator_saperate:
+            fig, ax = plt.subplots(figsize=(20, 10))
+            # 绘制指标图
+            for column in indicator_df.columns:
+                ax.plot(
+                    indicator_df.index,
+                    indicator_df[column],
+                    label=column,
+                    linewidth=0.25,
+                )
+        else:
+            fig = plt.figure(figsize=(20, 12))
+            gs = fig.add_gridspec(2, 1, height_ratios=[5, 1])
+            ax = fig.add_subplot(gs[0])
+            ax2 = fig.add_subplot(gs[1])
+            # 控制间隙
+            plt.subplots_adjust(hspace=0)
+
+            # 绘制指标图
+            for column in indicator_df.columns:
+                ax2.plot(
+                    indicator_df.index,
+                    indicator_df[column],
+                    label=column,
+                    linewidth=0.25,
+                )
+
         # 绘制k线图
         ax.plot(data_df.index, data_df["收盘"], color="white", linewidth=0.25)
         # 根据策略数值绘制红点（卖出操作）和绿点（买入操作）
@@ -219,7 +223,9 @@ class Plotter:
         # 设置图例
         plt.legend()
         # 设置标题
-        plt.title(f"{self.product_code}_{period}{strategy_name.value}", color="white")
+        ax.set_title(
+            f"{self.product_code}_{period}{strategy_name.value}", color="white"
+        )
         # 保存图片
         if save:
             plt.savefig(
@@ -236,12 +242,13 @@ if __name__ == "__main__":
     Plotter(
         data_path=None,
         today_date=dt.date.today(),
-        product_code="600418",
+        product_code="002230",
         product_type=ProductType.Stock,
         product_df_dict=None,
     ).plot_strategy(
-        indicator_name=IndicatorName.SRLine,
-        strategy_name=StrategyName.SRLine_PSS,
-        from_date=2000,
+        indicator_name=IndicatorName.RSI,
+        strategy_name=StrategyName.RSI_VRS,
+        from_date=1000,
         to_date=1,
+        indicator_saperate=True,
     )

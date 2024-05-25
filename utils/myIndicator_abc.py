@@ -3,7 +3,8 @@
 from abc import ABC, abstractmethod
 from pandas import DataFrame
 from utils import dataSource_picker as dp
-from utils.enumeration_label import ProductType, IndicatorName
+from utils.enumeration_label import ProductType, IndicatorName, StrategyName
+from utils import plotter as pl
 from config import __BASE_PATH__, do_logging
 from typing import Optional
 
@@ -38,6 +39,13 @@ class MyIndicator(ABC):
             product_code=product_code,
             today_date=today_date,
             product_type=product_type,
+        )
+        self.plotter = pl.Plotter(
+            data_path=self.data_path,
+            today_date=self.today_date,
+            product_code=self.product_code,
+            product_type=self.product_type,
+            product_df_dict=self.product_df_dict,
         )
 
     def _remove_redundant_files(self) -> None:
@@ -105,6 +113,9 @@ class MyIndicator(ABC):
                 strategy_config_dict=None,
             )
 
+        # 绘制指标图
+        self.plotter.plot_indicator(indicator_name=self.indicator_name)
+
     def get_dict(self) -> dict[str, DataFrame]:
         """
         一些机械的重复性工作，在analyze()函数内部，先调用本函数，获取指标数据
@@ -127,6 +138,7 @@ class MyIndicator(ABC):
         df_judge: DataFrame,
         func_name: str,
         strategy_config_value_dict: Optional[dict],
+        saperate: bool = False,
     ) -> None:
         """
         输出df_sma_judge为csv文件，在strategy文件夹中\n
@@ -149,6 +161,16 @@ class MyIndicator(ABC):
                 strategy_config_dict=self.make_strategy_config_dict(
                     strategy_name=func_name, **strategy_config_value_dict
                 ),
+            )
+
+        # 绘制策略图
+        enum_dict = {member.value: member for member in StrategyName}
+        key_name = enum_dict.get(func_name)
+        if key_name is not None:
+            self.plotter.plot_strategy(
+                indicator_name=self.indicator_name,
+                strategy_name=key_name,
+                indicator_saperate=saperate,
             )
 
     def make_indicator_config_dict(self, **kwargs) -> dict:

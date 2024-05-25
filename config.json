@@ -1,26 +1,5 @@
 {
     "ValueInCalculation": {
-        "Boll": {
-            "time_window": 10,
-            "k": 2,
-            "_boll_strategy": {
-                "strategy_name": "_boll_strategy",
-                "up_track_value_list": [
-                    -1,
-                    -0.95,
-                    -0.75,
-                    -0.5,
-                    -0.25
-                ],
-                "down_track_value_list": [
-                    1,
-                    0.8,
-                    0.6,
-                    0.4,
-                    0.2
-                ]
-            }
-        },
         "SMA": {
             "span_list": [
                 5,
@@ -57,26 +36,49 @@
                 ]
             }
         },
+        "Boll": {
+            "time_window": 10,
+            "k": 2,
+            "_boll_strategy": {
+                "strategy_name": "_boll_strategy",
+                "up_track_value_list": [
+                    -1,
+                    -0.95,
+                    -0.75,
+                    -0.5,
+                    -0.25
+                ],
+                "down_track_value_list": [
+                    1,
+                    0.8,
+                    0.6,
+                    0.4,
+                    0.2
+                ]
+            }
+        },
         "SRLine": {
             "threshold": 0.05,
             "_pressure_area_strategy": {
                 "strategy_name": "_pressure_area_strategy",
                 "area_num": 20
             }
+        },
+        "RSI": {
+            "short_term": 7,
+            "long_term": 14,
+            "_exceedingly_trade_strategy": {
+                "strategy_name": "_exceedingly_trade_strategy",
+                "threshold_1": 75.0,
+                "threshold_2": 25.0
+            }
         }
     },
     "dataDirectoryStructure": {
-        "E:\\PYTHON\\MyPythonProjects\\goInvest": {
+        "e:\\PYTHON\\MyPythonProjects\\goInvest": {
             "data": {
                 "stock": {
-                    "600418": {
-                        "kline": {},
-                        "indicator": {},
-                        "strategy": {},
-                        "test": {},
-                        "plot": {}
-                    },
-                    "002230": {
+                    "io2004C4450": {
                         "kline": {},
                         "indicator": {},
                         "strategy": {},

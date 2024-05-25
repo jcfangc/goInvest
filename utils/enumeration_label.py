@@ -32,3 +32,5 @@ class StrategyName(Enum):
     SMA_MTL = "_mutiline_strategy"
     EMA_MTL = "_mutiline_strategy"
     SRLine_PSS = "_pressure_area_strategy"
+    RSI_ECD = "_exceedingly_trade_strategy"
+    RSI_VRS = "_versus_sma_strategy"

@@ -415,14 +415,18 @@ class DataFunctionalizer:
     def check_cross(
         main_series: Series,
         sub_series: Series,
-    ) -> Series:
+        up_down: bool = False,
+    ) -> Series | DataFrame:
         """
-        检查两条序列的交叉情况\n
+        检查两条序列的交叉情况，上穿和下穿是相对于主序列而言\n
+        即副序列上穿主序列，或者副序列下穿主序列\n
         - 参数：\n
             - main_series: 主序列，应为浮点数，index为日期\n
             - sub_series: 副序列，应为浮点数，index为日期\n
+            - up_down: 区分上穿和下穿\n
         - 返回值：\n
-            - 返回一个序列，为交叉点，为日期\n
+            - 如果不区分上穿和下穿，返回一个序列，为交叉点，为日期\n
+            - 如果区分上穿和下穿，返回一个DataFrame，包含两列，分别为上穿点和下穿点，为日期\n
         """
 
         # 检查
@@ -433,6 +437,8 @@ class DataFunctionalizer:
                 call_name=DataFunctionalizer.check_cross.__name__,
             )
 
+        up_cross_list = []
+        down_cross_list = []
         cross_list = []
 
         # 取较短序列的长度
@@ -443,20 +449,41 @@ class DataFunctionalizer:
             j = i + 1
             # 上穿
             if (main_series[i] > sub_series[i]) and (main_series[j] <= sub_series[j]):
-                cross_list.append(main_series.index[j])
+                cross_list.append(
+                    main_series.index[j]
+                ) if not up_down else up_cross_list.append(main_series.index[j])
                 continue
             # 下穿
             if (main_series[i] < sub_series[i]) and (main_series[j] >= sub_series[j]):
-                cross_list.append(main_series.index[j])
+                cross_list.append(
+                    main_series.index[j]
+                ) if not up_down else down_cross_list.append(main_series.index[j])
                 continue
 
-        # 日期从远到近排序
-        cross_list.sort()
-        # 将列表转换为Series
-        return_series = Series(cross_list)
-        # print(return_series.head(20))
-
-        return return_series
+        if up_down:
+            # 日期从远到近排序
+            up_cross_list.sort()
+            down_cross_list.sort()
+            # 修剪列表
+            shorter_length = min(len(up_cross_list), len(down_cross_list))
+            # 保留列表的后shorter_length个元素
+            up_cross_list = up_cross_list[-shorter_length:]
+            down_cross_list = down_cross_list[-shorter_length:]
+            # 将列表转换为DataFrame
+            return_df = DataFrame(
+                columns=["上穿", "下穿"],
+            )
+            return_df["上穿"] = up_cross_list
+            return_df["下穿"] = down_cross_list
+            # 返回结果
+            return return_df
+        else:
+            # 日期从远到近排序
+            cross_list.sort()
+            # 将列表转换为Series
+            return_series = Series(cross_list)
+            # 返回结果
+            return return_series
 
 
 if __name__ == "__main__":

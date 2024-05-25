@@ -2,11 +2,12 @@
 
 import datetime as dt
 import pandas as pd
+import json
 
 from config import __BASE_PATH__
 from utils import dataSource_picker as dp
 from utils.enumeration_label import ProductType
-from indicator import myBoll, myEMA, mySMA, mySRLine
+from indicator import myBoll, myEMA, mySMA, mySRLine, myRSI
 
 # 通用参数
 params = {}
@@ -32,14 +33,25 @@ class StockAnalyst:
         params["product_df_dict"] = self.product_df_dict
 
     def analyze(self):
-        # 移动平均线分析
-        self.result_list = mySMA.MySMA(data_path=None, **params).analyze()
-        # 指数移动平均线分析
-        self.result_list.extend(myEMA.MyEMA(data_path=None, **params).analyze())
-        # 布林带分析
-        self.result_list.extend(myBoll.MyBoll(data_path=None, **params).analyze())
-        # 支撑线阻力线分析
-        self.result_list.extend(mySRLine.MySRLine(data_path=None, **params).analyze())
+        default_analyze_list = ["SMA", "EMA", "Boll", "SRLine", "RSI"]
+        analyze_list = self.analyze_list_from_config() or default_analyze_list
+        if "SMA" in analyze_list:
+            # 移动平均线分析
+            self.result_list = mySMA.MySMA(data_path=None, **params).analyze()
+        if "EMA" in analyze_list:
+            # 指数移动平均线分析
+            self.result_list.extend(myEMA.MyEMA(data_path=None, **params).analyze())
+        if "Boll" in analyze_list:
+            # 布林带分析
+            self.result_list.extend(myBoll.MyBoll(data_path=None, **params).analyze())
+        if "SRLine" in analyze_list:
+            # 支撑线阻力线分析
+            self.result_list.extend(
+                mySRLine.MySRLine(data_path=None, **params).analyze()
+            )
+        if "RSI" in analyze_list:
+            # RSI分析
+            self.result_list.extend(myRSI.MyRSI(data_path=None, **params).analyze())
 
         print("开始计算综合分析结果...")
         # 创建一个空的DataFrame，用于存放综合的买入卖出建议
@@ -81,3 +93,32 @@ class StockAnalyst:
         ) as f:
             df_comperhensive_judge.to_csv(f)
             print(f"查看{self.product_code}的综合分析结果\n>>>>{f.name}")
+
+    def analyze_list_from_config(self):
+        """从配置文件获取分析列表"""
+        with open(
+            file=f"{__BASE_PATH__}\\config.json",
+            mode="r",
+            encoding="utf-8",
+        ) as f:
+            # 读取配置文件
+            config_dict = json.load(f)
+            # 检查是否存在analyze_list键
+            if "analyze_list" not in config_dict.keys():
+                # 如果不存在，返回默认值
+                return None
+            else:
+                analyze_list = config_dict["analyze_list"]
+                return analyze_list
+
+    def analyze_list_to_config(self, analyze_list: list):
+        """将分析列表写入配置文件"""
+        with open(
+            file=f"{__BASE_PATH__}\\config.json",
+            mode="r",
+            encoding="utf-8",
+        ) as f:
+            # 读取配置文件
+            config_dict = json.load(f)
+            # 更新配置文件
+            config_dict["analyze_list"] = analyze_list

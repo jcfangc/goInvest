@@ -201,9 +201,9 @@ class MySRLine(MyIndicator):
                 pressue_area_index_list.append(area_indices)
 
             # 获取股票数据收盘价格和支撑/阻力线数据的交叉情况
-            # 和阻力线交叉
+            # 和阻力线交叉 Series
             resistance_cross = dfunc.check_cross(resistance_line, closing_price)
-            # 和支撑线交叉
+            # 和支撑线交叉 Series
             support_cross = dfunc.check_cross(support_line, closing_price)
 
             met_line = "undefined"
